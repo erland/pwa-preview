@@ -7,12 +7,15 @@
 | Variable | Purpose | Production guidance |
 |---|---|---|
 | `CONTROL_PLANE_HOST` | Exact hostname for UI, REST, auth and MCP | `pwa-preview.apps.isaksson.info` |
-| `PREVIEW_DOMAIN_SUFFIX` | Suffix below which preview IDs are served | `previewapp.apphome.one` |
+| `CONTROL_PLANE_REGISTRABLE_DOMAIN` | Registrerbar domän som kontrollplanet tillhör | `isaksson.info` |
+| `PREVIEW_DOMAIN_SUFFIX` | Suffix below which preview IDs are served; must be outside the control-plane registrable domain | `previewapp.apphome.one` |
 | `DATABASE_URL` | PostgreSQL connection string | Secret; do not log |
 | `DATA_ROOT` | Persistent filesystem root | `/data`; filesystem root `/` is rejected |
 | `SESSION_SECRET` | Secure-session secret | At least 32 characters; random per environment |
 | `GITHUB_CLIENT_ID` | GitHub OAuth client ID | From GitHub OAuth App |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | Secret |
+
+`CONTROL_PLANE_HOST` must belong to `CONTROL_PLANE_REGISTRABLE_DOMAIN`. `PREVIEW_DOMAIN_SUFFIX` is rejected at startup if it is the same domain or a subdomain of that registrable control-plane domain. This keeps arbitrary preview JavaScript outside the control-plane cookie/site boundary.
 
 ## Listener
 
