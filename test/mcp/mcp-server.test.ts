@@ -1,0 +1,39 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createMcpHttpHandler } from '../../src/mcp/server.js';
+
+function fakeService() {
+  const preview = { id:'p-1234567890abcdef', hostname:'p-1234567890abcdef.preview.test', displayName:'Demo', status:'READY', createdAt:new Date('2026-01-01T00:00:00Z'), updatedAt:new Date('2026-01-01T00:00:00Z'), expiresAt:new Date('2026-01-01T01:00:00Z'), compressedSizeBytes:10, extractedSizeBytes:20, fileCount:2, sourceSha256:'abc', sourceType:'URL' };
+  return {
+    listOwned: vi.fn(async () => [preview]),
+    getOwned: vi.fn(async () => preview),
+    createFromUrl: vi.fn(async () => preview),
+    updateFromUrl: vi.fn(async () => preview),
+    extendOwned: vi.fn(async () => preview),
+    deleteOwned: vi.fn(async () => true),
+  } as any;
+}
+
+async function rpc(handler: ReturnType<typeof createMcpHttpHandler>, body: unknown) {
+  const response = await handler.fetch(new Request('https://control.test/mcp', {
+    method:'POST', headers:{'content-type':'application/json','accept':'application/json, text/event-stream'}, body:JSON.stringify(body),
+  }));
+  const text = await response.text();
+  const dataLine = text.split('\n').find((line) => line.startsWith('data: '));
+  return JSON.parse(dataLine ? dataLine.slice(6) : text);
+}
+
+describe('MCP server', () => {
+  it('exposes all lifecycle tools', async () => {
+    const handler = createMcpHttpHandler(fakeService(), 'user-a');
+    const reply = await rpc(handler, { jsonrpc:'2.0', id:1, method:'tools/list', params:{} });
+    const names = reply.result.tools.map((t:any)=>t.name);
+    expect(names).toEqual(expect.arrayContaining(['preview_create','preview_list','preview_get','preview_update','preview_extend','preview_delete']));
+  });
+
+  it('derives owner from authenticated MCP identity', async () => {
+    const service = fakeService();
+    const handler = createMcpHttpHandler(service, 'user-a');
+    await rpc(handler, { jsonrpc:'2.0', id:2, method:'tools/call', params:{ name:'preview_create', arguments:{ sourceUrl:'https://example.com/app.zip' } } });
+    expect(service.createFromUrl).toHaveBeenCalledWith(expect.objectContaining({ ownerUserId:'user-a', sourceUrl:'https://example.com/app.zip' }));
+  });
+});

@@ -1,0 +1,54 @@
+{
+  "name": "pwa-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "vite build && tsc -p tsconfig.build.json && mkdir -p dist/persistence/migrations && cp src/persistence/migrations/*.sql dist/persistence/migrations/",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && npm run build",
+    "db:migrate": "node dist/persistence/migrate.js",
+    "db:migrate:dev": "tsx src/persistence/migrate.ts",
+    "test:integration": "vitest run test/integration",
+    "dev:ui": "vite",
+    "test:security": "vitest run test/security test/integration/database.integration.test.ts",
+    "test:e2e": "node -e \"if(!process.env.TEST_DATABASE_URL){console.error(\\\"TEST_DATABASE_URL is required for E2E\\\");process.exit(1)}\" && vitest run test/e2e",
+    "test:agent-workspace": "node -e \"if(!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V1||!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V2){console.error(\\\"AGENT_WORKSPACE_ARTIFACT_URL_V1 and _V2 are required\\\");process.exit(1)}\" && vitest run test/integration/agent-workspace-url.integration.test.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^9.2.1",
+    "@fastify/secure-session": "^8.2.0",
+    "fastify": "^5.6.1",
+    "pg": "^8.16.3",
+    "tar-stream": "^3.1.7",
+    "yauzl": "^3.2.0",
+    "@fastify/static": "^8.3.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "@types/pg": "^8.15.5",
+    "@types/tar-stream": "^3.1.4",
+    "@types/yauzl": "^2.10.3",
+    "@types/yazl": "^2.4.5",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "yazl": "^3.3.1",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.7"
+  }
+}
