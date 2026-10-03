@@ -1,14 +1,38 @@
 # Coolify deployment – pwa-preview
 
-## Hosts
+## Compose model
 
-Control plane:
+Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application and assumes PostgreSQL is provided separately through `DATABASE_URL`.
+
+The ordinary `compose.yaml` is intended for local development and includes its own PostgreSQL container.
+
+Recommended production database model:
 
 ```text
-pwa-preview.apps.isaksson.info
+shared PostgreSQL instance
+└── database: pwa_preview
+    └── user: pwa_preview
 ```
 
-Preview plane:
+The PostgreSQL server/cluster may be shared with other services, but pwa-preview should use its own database and database user. The application migrations then own only that database.
+
+## Hosts
+
+The host names are configuration, not hard-coded application values.
+
+Example control plane:
+
+```text
+CONTROL_PLANE_HOST=pwa-preview.apps.isaksson.info
+```
+
+Example preview plane:
+
+```text
+PREVIEW_DOMAIN_SUFFIX=previewapp.apphome.one
+```
+
+This produces preview hosts under:
 
 ```text
 *.previewapp.apphome.one
@@ -18,7 +42,7 @@ Only these host classes are accepted by the application. Unknown hosts return 40
 
 ## DNS and TLS
 
-Create a wildcard DNS record for `*.previewapp.apphome.one` pointing at the Coolify/Traefik ingress. Configure the reverse proxy with both `pwa-preview.apps.isaksson.info` and `*.previewapp.apphome.one` on the same application service.
+Create a wildcard DNS record for `*.<PREVIEW_DOMAIN_SUFFIX>` pointing at the Coolify/Traefik ingress. Configure the reverse proxy with both `<CONTROL_PLANE_HOST>` and `*.<PREVIEW_DOMAIN_SUFFIX>` on the same application service.
 
 The wildcard certificate must be issued with a DNS-01 challenge. HTTP-01 cannot issue a wildcard certificate. Configure the DNS-provider credentials in Coolify/Traefik, not in the pwa-preview container.
 
@@ -32,7 +56,9 @@ Mount a persistent volume at:
 /data
 ```
 
-Use PostgreSQL 17 or later for metadata. This v1 architecture assumes one active pwa-preview application instance because `/data` is local persistent storage.
+Use PostgreSQL 17 or later for metadata. The recommended Coolify setup reuses a shared PostgreSQL instance but gives pwa-preview its own database and user. Set `DATABASE_URL` to that database; `compose.coolify.yaml` does not start PostgreSQL itself.
+
+This v1 architecture assumes one active pwa-preview application instance because `/data` is local persistent storage.
 
 ## Required environment variables
 
@@ -47,13 +73,34 @@ GITHUB_CLIENT_SECRET=...
 MIGRATE_ON_START=false
 ```
 
-The GitHub OAuth callback is:
+The GitHub OAuth callback is derived from the configured control host:
+
+```text
+https://<CONTROL_PLANE_HOST>/auth/callback/github
+```
+
+For the example above this becomes:
 
 ```text
 https://pwa-preview.apps.isaksson.info/auth/callback/github
 ```
 
-Register that exact callback URL in the GitHub OAuth application.
+Register the exact deployed callback URL in the GitHub OAuth application.
+
+## Coolify environment
+
+At minimum configure these values in Coolify rather than committing them to the compose file:
+
+```text
+CONTROL_PLANE_HOST=...
+PREVIEW_DOMAIN_SUFFIX=...
+DATABASE_URL=postgres://pwa_preview:<password>@<shared-postgres-host>:5432/pwa_preview
+SESSION_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
+
+Then deploy with `compose.coolify.yaml`. It intentionally has no published host port; Coolify/Traefik routes to the exposed internal port 3000.
 
 ## Database migrations
 
