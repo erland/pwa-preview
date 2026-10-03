@@ -1,4 +1,5 @@
-import { readFile, stat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
@@ -32,12 +33,12 @@ export async function servePreview(req: FastifyRequest, reply: FastifyReply, pre
     info = await stat(target).catch(()=>null);
     if (!info?.isFile()) { await reply.code(404).send(); return; }
   }
-  const body = await readFile(target);
   reply.header('X-Content-Type-Options','nosniff');
   reply.header('X-Robots-Tag','noindex, nofollow');
   reply.header('Referrer-Policy','no-referrer');
   reply.header('Cache-Control', path.extname(target)==='.html' ? 'no-store' : 'no-cache');
+  reply.header('Content-Length', String(info.size));
   reply.type(MIME[path.extname(target).toLowerCase()] ?? 'application/octet-stream');
   if (req.method === 'HEAD') { await reply.send(); return; }
-  await reply.send(body);
+  await reply.send(createReadStream(target));
 }
