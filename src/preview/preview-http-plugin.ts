@@ -1,6 +1,8 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
@@ -90,9 +92,8 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
       const dir = await mkdtemp(path.join(os.tmpdir(), 'pwa-preview-update-'));
       const archivePath = path.join(dir, 'artifact');
       try {
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) chunks.push(Buffer.from(chunk));
-        await writeFile(archivePath, Buffer.concat(chunks));
+        await pipeline(part.file, createWriteStream(archivePath, { flags: 'wx', mode: 0o600 }));
+        if (part.file.truncated) throw new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT');
         const preview = await service.updateFromFile({ ownerUserId: request.authContext!.userId, previewId: id, archivePath });
         if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
         return previewResponse(preview);
@@ -153,9 +154,8 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
     const dir = await mkdtemp(path.join(os.tmpdir(), 'pwa-preview-upload-'));
     const archivePath = path.join(dir, 'artifact');
     try {
-      const chunks: Buffer[] = [];
-      for await (const chunk of part.file) chunks.push(Buffer.from(chunk));
-      await writeFile(archivePath, Buffer.concat(chunks));
+      await pipeline(part.file, createWriteStream(archivePath, { flags: 'wx', mode: 0o600 }));
+      if (part.file.truncated) throw new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT');
       const preview = await service.createFromFile({
         ownerUserId: request.authContext!.userId,
         archivePath,
