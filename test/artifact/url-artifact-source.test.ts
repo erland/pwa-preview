@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import { SsrfPolicy } from '../../src/artifact/ssrf-policy.js';
 import { UrlArtifactSource, type DownloadHop } from '../../src/artifact/url-artifact-source.js';
 
@@ -8,10 +8,22 @@ const config = { urlFetchTimeoutMs:1000, maxRedirects:2, maxCompressedBytes:1000
 describe('UrlArtifactSource', () => {
   it('downloads an allowed HTTPS artifact', async () => {
     const policy = new SsrfPolicy(async () => [{ address:'1.1.1.1', family:4 }]);
-    const hop: DownloadHop = async () => ({ kind:'body', body:Buffer.from('abc') });
+    const hop: DownloadHop = async (_url, _address, _family, _timeout, _maxBytes, destinationPath) => { await writeFile(destinationPath, 'abc'); return { kind:'body', bytes:3 }; };
     const source = new UrlArtifactSource(config, policy, hop);
     const result = await source.fetch('https://example.com/a.zip');
-    try { expect(await readFile(result.archivePath, 'utf8')).toBe('abc'); } finally { await result.cleanup(); }
+    expect(await readFile(result.archivePath, 'utf8')).toBe('abc');
+    await result.cleanup();
+    await expect(access(result.archivePath)).rejects.toThrow();
+  });
+
+  it('rejects a downloaded body reported above the compressed-size limit', async () => {
+    const policy = new SsrfPolicy(async () => [{address:'1.1.1.1',family:4}]);
+    const hop: DownloadHop = async (_url, _address, _family, _timeout, _maxBytes, destinationPath) => {
+      await writeFile(destinationPath, 'oversized');
+      return { kind:'body', bytes:1001 };
+    };
+    const source = new UrlArtifactSource(config, policy, hop);
+    await expect(source.fetch('https://example.com/a.zip')).rejects.toThrow('ARTIFACT_COMPRESSED_SIZE_LIMIT');
   });
 
   it('revalidates redirect destinations and blocks private targets', async () => {
