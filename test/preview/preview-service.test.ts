@@ -83,4 +83,29 @@ describe('PreviewService', () => {
     await rm(root,{recursive:true,force:true});
   });
 
+
+  it('rejects creation when the owner storage quota would be exceeded', async () => {
+    const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-service-'));
+    const archive=path.join(root,'site.zip'); await zip(archive);
+    const store=new LocalVolumeObjectStore(path.join(root,'data')); await store.initialize();
+    const repo=new FakeRepo();
+    const limited={...config(path.join(root,'data')),maxStorageBytesPerUser:1};
+    const service=new PreviewService(limited, repo as unknown as PreviewRepository, store);
+    await expect(service.createFromFile({ownerUserId:'owner-a',archivePath:archive})).rejects.toThrow('USER_STORAGE_QUOTA_LIMIT');
+    expect(repo.item.status).toBe('FAILED');
+    await rm(root,{recursive:true,force:true});
+  });
+
+  it('rejects creation when the total storage quota would be exceeded', async () => {
+    const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-service-'));
+    const archive=path.join(root,'site.zip'); await zip(archive);
+    const store=new LocalVolumeObjectStore(path.join(root,'data')); await store.initialize();
+    const repo=new FakeRepo();
+    const limited={...config(path.join(root,'data')),maxStorageBytesPerUser:1000000,maxStorageBytesTotal:1};
+    const service=new PreviewService(limited, repo as unknown as PreviewRepository, store);
+    await expect(service.createFromFile({ownerUserId:'owner-a',archivePath:archive})).rejects.toThrow('TOTAL_STORAGE_QUOTA_LIMIT');
+    expect(repo.item.status).toBe('FAILED');
+    await rm(root,{recursive:true,force:true});
+  });
+
 });
