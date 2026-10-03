@@ -1,5 +1,6 @@
 export type AppConfig = Readonly<{
   controlPlaneHost: string;
+  controlPlaneRegistrableDomain: string;
   previewDomainSuffix: string;
   databaseUrl: string;
   dataRoot: string;
@@ -84,9 +85,21 @@ export function loadConfig(env: Env = process.env): AppConfig {
     throw new Error('Invalid configuration: SESSION_SECRET must be at least 32 characters');
   }
 
+  const controlPlaneHost = host(required(env, 'CONTROL_PLANE_HOST'), 'CONTROL_PLANE_HOST');
+  const controlPlaneRegistrableDomain = host(required(env, 'CONTROL_PLANE_REGISTRABLE_DOMAIN'), 'CONTROL_PLANE_REGISTRABLE_DOMAIN');
+  const previewDomainSuffix = host(required(env, 'PREVIEW_DOMAIN_SUFFIX'), 'PREVIEW_DOMAIN_SUFFIX');
+
+  if (controlPlaneHost !== controlPlaneRegistrableDomain && !controlPlaneHost.endsWith(`.${controlPlaneRegistrableDomain}`)) {
+    throw new Error('Invalid configuration: CONTROL_PLANE_HOST must be within CONTROL_PLANE_REGISTRABLE_DOMAIN');
+  }
+  if (previewDomainSuffix === controlPlaneRegistrableDomain || previewDomainSuffix.endsWith(`.${controlPlaneRegistrableDomain}`)) {
+    throw new Error('Invalid configuration: PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain');
+  }
+
   return Object.freeze({
-    controlPlaneHost: host(required(env, 'CONTROL_PLANE_HOST'), 'CONTROL_PLANE_HOST'),
-    previewDomainSuffix: host(required(env, 'PREVIEW_DOMAIN_SUFFIX'), 'PREVIEW_DOMAIN_SUFFIX'),
+    controlPlaneHost,
+    controlPlaneRegistrableDomain,
+    previewDomainSuffix,
     databaseUrl: required(env, 'DATABASE_URL'),
     dataRoot: absolutePath(env.DATA_ROOT?.trim() || '/data', 'DATA_ROOT'),
     sessionSecret,
@@ -116,6 +129,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
 export function safeConfigSummary(config: AppConfig): Record<string, string | number> {
   return {
     controlPlaneHost: config.controlPlaneHost,
+    controlPlaneRegistrableDomain: config.controlPlaneRegistrableDomain,
     previewDomainSuffix: config.previewDomainSuffix,
     dataRoot: config.dataRoot,
     ttlMinMinutes: config.ttlMinMinutes,
