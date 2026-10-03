@@ -3,7 +3,8 @@ import { loadConfig, safeConfigSummary } from '../src/config.js';
 
 const baseEnv = {
   CONTROL_PLANE_HOST: 'pwa-preview.apps.example.test',
-  PREVIEW_DOMAIN_SUFFIX: 'preview.example.test',
+  CONTROL_PLANE_REGISTRABLE_DOMAIN: 'example.test',
+  PREVIEW_DOMAIN_SUFFIX: 'preview.example-preview.test',
   DATABASE_URL: 'postgres://user:password@localhost:5432/pwa_preview',
   SESSION_SECRET: '0123456789abcdef0123456789abcdef',
   GITHUB_CLIENT_ID: 'github-client-id',
@@ -15,7 +16,8 @@ describe('configuration', () => {
     const config = loadConfig(baseEnv);
     expect(config).toMatchObject({
       controlPlaneHost: 'pwa-preview.apps.example.test',
-      previewDomainSuffix: 'preview.example.test',
+      controlPlaneRegistrableDomain: 'example.test',
+      previewDomainSuffix: 'preview.example-preview.test',
       dataRoot: '/data',
       ttlMinMinutes: 5,
       ttlDefaultMinutes: 30,
@@ -33,6 +35,16 @@ describe('configuration', () => {
     });
   });
 
+
+  it('rejects preview hosts inside the control-plane registrable domain', () => {
+    expect(() => loadConfig({ ...baseEnv, PREVIEW_DOMAIN_SUFFIX: 'preview.example.test' }))
+      .toThrow('PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain');
+  });
+
+  it('rejects a control-plane host outside its declared registrable domain', () => {
+    expect(() => loadConfig({ ...baseEnv, CONTROL_PLANE_REGISTRABLE_DOMAIN: 'other.test' }))
+      .toThrow('CONTROL_PLANE_HOST must be within CONTROL_PLANE_REGISTRABLE_DOMAIN');
+  });
 
   it('rejects filesystem root as DATA_ROOT', () => {
     expect(() => loadConfig({ ...baseEnv, DATA_ROOT: '/' }))

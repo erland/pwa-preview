@@ -34,7 +34,7 @@ class MemoryPreviewRepository {
 }
 
 function config(dataRoot:string): AppConfig { return {
-  controlPlaneHost:'control.example.com', previewDomainSuffix:'preview.example.com', databaseUrl:'postgres://unused', dataRoot,
+  controlPlaneHost:'control.example.com', controlPlaneRegistrableDomain:'example.com', previewDomainSuffix:'preview.example.net', databaseUrl:'postgres://unused', dataRoot,
   sessionSecret:'x'.repeat(32), githubClientId:'unused', githubClientSecret:'unused', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
   maxCompressedBytes:100*1024*1024, maxExtractedBytes:500*1024*1024, maxFileCount:20000, maxPathLength:1024, urlFetchTimeoutMs:30000, maxRedirects:5,
       maxActivePreviewsPerUser: 20,

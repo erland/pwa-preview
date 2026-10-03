@@ -3,7 +3,8 @@ services:
     build: .
     environment:
       PORT: 3000
-      CONTROL_PLANE_HOST: localhost
+      CONTROL_PLANE_HOST: control.localhost
+      CONTROL_PLANE_REGISTRABLE_DOMAIN: control.localhost
       PREVIEW_DOMAIN_SUFFIX: preview.localhost
       DATABASE_URL: postgres://pwa_preview:pwa_preview@postgres:5432/pwa_preview
       DATA_ROOT: /data
