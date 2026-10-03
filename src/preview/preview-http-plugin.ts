@@ -52,6 +52,17 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
     await servePreview(request, reply, id, repository, store);
   });
 
+  app.setNotFoundHandler(async (request, reply) => {
+    const plane = classifyRequestPlane(request.headers.host, config.controlPlaneHost, config.previewDomainSuffix);
+    if (plane === 'PREVIEW') {
+      const id = resolvePreviewIdFromHost(request.headers.host, config.previewDomainSuffix);
+      if (!id) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
+      await servePreview(request, reply, id, repository, store);
+      return;
+    }
+    return reply.code(404).send({ error: 'NOT_FOUND' });
+  });
+
   app.get('/api/previews', { preHandler: requireAuth }, async (request) => {
     const previews = await service.listOwned(request.authContext!.userId);
     return { previews: previews.map(previewResponse) };
