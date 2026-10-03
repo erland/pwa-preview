@@ -8,6 +8,7 @@ const config: AppConfig = {
   sessionSecret: '0123456789012345678901234567890123456789', githubClientId: 'client', githubClientSecret: 'secret',
   ttlMinMinutes: 5, ttlDefaultMinutes: 30, ttlMaxMinutes: 1440, maxCompressedBytes: 1, maxExtractedBytes: 2,
   maxFileCount: 3, maxPathLength: 1024, urlFetchTimeoutMs: 30000, maxRedirects: 5,
+  maxActivePreviewsPerUser:20, maxConcurrentImportsPerUser:2,
   cleanupIntervalMs: 60000, reconciliationIntervalMs: 600000, staleOperationMinutes: 30, staleStagingMinutes: 60, migrateOnStart: true,
 };
 
