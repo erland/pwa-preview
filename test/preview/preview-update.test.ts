@@ -20,6 +20,7 @@ function config(root:string): AppConfig { return {
   maxCompressedBytes:100*1024*1024, maxExtractedBytes:500*1024*1024, maxFileCount:20000, maxPathLength:1024, urlFetchTimeoutMs:30000, maxRedirects:5,
       maxActivePreviewsPerUser: 20,
       maxConcurrentImportsPerUser: 2,
+  maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,
   cleanupIntervalMs:60000, reconciliationIntervalMs:600000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
 }; }
 function ready(ownerUserId='owner'): Preview { const now=new Date(); return { id:'p-0123456789abcdef0123456789abcdef', ownerUserId, displayName:null, status:'READY', hostname:'p-0123456789abcdef0123456789abcdef.previewapp.apphome.one', createdAt:now, updatedAt:now, expiresAt:new Date(now.getTime()+600000), compressedSizeBytes:1, extractedSizeBytes:1, fileCount:1, sourceSha256:'0'.repeat(64), sourceType:'UPLOAD', lastErrorCode:null }; }
@@ -28,6 +29,8 @@ class UpdateRepo {
   failMetadata=false;
   constructor(item=ready()){ this.item=item; }
   async findOwnedById(owner:string,id:string){ return this.item.ownerUserId===owner && this.item.id===id ? this.item : null; }
+  async sumReadyExtractedBytesOwned(){ return this.item.status==='READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
+  async sumReadyExtractedBytesTotal(){ return this.item.status==='READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
   async markUpdatedOwned(owner:string,id:string,m:any){
     if(this.failMetadata) throw new Error('DB_DOWN');
     if(this.item.ownerUserId!==owner || this.item.id!==id || this.item.status!=='READY') return null;
