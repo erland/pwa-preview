@@ -10,7 +10,7 @@ Artifacts, source URLs, archive entry names, Host headers and request paths are 
 
 - GitHub login requires a verified email and active allowlist match.
 - Stable external identity is `(provider, provider_subject)`.
-- Browser sessions use `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies.
+- Browser sessions use `Secure`, `HttpOnly`, `SameSite=Lax`, host-only cookies and are rechecked against the allowlist on authenticated requests; removed access invalidates the session on the next request.
 - MCP Bearer tokens map to the same local `User` model and are rechecked against the allowlist.
 - Preview management is strictly owner-scoped.
 - Cross-user lookup returns the same not-found behavior as a nonexistent preview.
