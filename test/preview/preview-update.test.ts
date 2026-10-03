@@ -18,6 +18,7 @@ function config(root:string): AppConfig { return {
   controlPlaneHost:'pwa-preview.apps.isaksson.info', previewDomainSuffix:'previewapp.apphome.one', databaseUrl:'postgres://x', dataRoot:root,
   sessionSecret:'x'.repeat(32), githubClientId:'x', githubClientSecret:'x', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
   maxCompressedBytes:100*1024*1024, maxExtractedBytes:500*1024*1024, maxFileCount:20000, maxPathLength:1024, urlFetchTimeoutMs:30000, maxRedirects:5,
+  cleanupIntervalMs:60000, reconciliationIntervalMs:600000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
 }; }
 function ready(ownerUserId='owner'): Preview { const now=new Date(); return { id:'p-0123456789abcdef0123456789abcdef', ownerUserId, displayName:null, status:'READY', hostname:'p-0123456789abcdef0123456789abcdef.previewapp.apphome.one', createdAt:now, updatedAt:now, expiresAt:new Date(now.getTime()+600000), compressedSizeBytes:1, extractedSizeBytes:1, fileCount:1, sourceSha256:'0'.repeat(64), sourceType:'UPLOAD', lastErrorCode:null }; }
 class UpdateRepo {
