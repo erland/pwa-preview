@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { LocalVolumeObjectStore } from '../../src/storage/local-volume-object-store.js';
 import { PreviewService } from '../../src/preview/preview-service.js';
 import type { Preview } from '../../src/domain/models.js';
+import { previewStorageKeyFromId } from '../../src/storage/storage-key.js';
 
 function preview(overrides: Partial<Preview> = {}): Preview {
   const now = new Date();
@@ -55,7 +56,7 @@ describe('PreviewService lifecycle', () => {
 
   it('deletes preview storage and is idempotent for the owner', async () => {
     const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-life-')); const store=new LocalVolumeObjectStore(root); await store.initialize();
-    const repo=new RepoStub(); await store.createPreviewArea(repo.value!.id); await writeFile(path.join(store.getPreviewSiteRoot(repo.value!.id),'index.html'),'ok');
+    const repo=new RepoStub(); const key=previewStorageKeyFromId(repo.value!.id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'ok');
     const service=new PreviewService(config, repo as any, store);
     expect(await service.deleteOwned('owner-b',repo.value!.id)).toBe(false);
     expect(await service.deleteOwned('owner-a',repo.value!.id)).toBe(true);
