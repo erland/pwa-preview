@@ -142,7 +142,11 @@ Tools: `preview_create`, `preview_list`, `preview_get`, `preview_update`, `previ
 
 ## Production deployment
 
-Production deployment is designed for Coolify/Traefik with control host `pwa-preview.apps.isaksson.info` and wildcard preview host `*.previewapp.apphome.one`. See [`docs/coolify-deployment.md`](docs/coolify-deployment.md) for DNS/TLS, migration, health-check and verification instructions.
+Production deployment is designed for Coolify/Traefik. Use `compose.coolify.yaml` for production; it starts only pwa-preview, keeps `/data` persistent, and expects an external/shared PostgreSQL database through `DATABASE_URL`. The ordinary `compose.yaml` remains the self-contained local-development stack with PostgreSQL included.
+
+Both the control-plane hostname and preview wildcard suffix are configurable through `CONTROL_PLANE_HOST` and `PREVIEW_DOMAIN_SUFFIX`; the application does not depend on specific DNS names.
+
+See [`docs/coolify-deployment.md`](docs/coolify-deployment.md) for shared PostgreSQL, DNS/TLS, migration, health-check and verification instructions.
 
 ### Release security regression suite
 
