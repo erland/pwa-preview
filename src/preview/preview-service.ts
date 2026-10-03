@@ -1,0 +1,174 @@
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import type { AppConfig } from '../config.js';
+import type { Preview } from '../domain/models.js';
+import { ArchiveImporter } from '../artifact/archive-importer.js';
+import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
+import type { ObjectStore } from '../storage/object-store.js';
+import { previewStorageKey, type StagingKey } from '../storage/storage-key.js';
+import { createPreviewId } from './preview-id.js';
+import { PreviewPublisher } from './preview-publisher.js';
+import { UrlArtifactSource } from '../artifact/url-artifact-source.js';
+
+async function sha256File(file: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest('hex');
+}
+
+export class PreviewService {
+  private readonly importer: ArchiveImporter;
+  private readonly publisher: PreviewPublisher;
+  private readonly urlSource: UrlArtifactSource;
+
+  private readonly updateLocks = new Map<string, Promise<void>>();
+
+  constructor(
+    private readonly config: AppConfig,
+    private readonly repository: PreviewRepository,
+    private readonly store: ObjectStore,
+  ) {
+    this.importer = new ArchiveImporter(store, {
+      maxCompressedBytes: config.maxCompressedBytes,
+      maxExtractedBytes: config.maxExtractedBytes,
+      maxFileCount: config.maxFileCount,
+      maxPathLength: config.maxPathLength,
+    });
+    this.publisher = new PreviewPublisher(store);
+    this.urlSource = new UrlArtifactSource(config);
+  }
+
+  async createFromFile(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null }): Promise<Preview> {
+    return this.createFromArtifact({ ...input, sourceType: 'UPLOAD' });
+  }
+
+  async createFromUrl(input: { ownerUserId: string; sourceUrl: string; lifetimeMinutes?: number; displayName?: string | null }): Promise<Preview> {
+    const fetched = await this.urlSource.fetch(input.sourceUrl);
+    try {
+      return await this.createFromArtifact({
+        ownerUserId: input.ownerUserId,
+        archivePath: fetched.archivePath,
+        sourceType: 'URL',
+        ...(input.lifetimeMinutes !== undefined ? { lifetimeMinutes: input.lifetimeMinutes } : {}),
+        ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+      });
+    } finally {
+      await fetched.cleanup().catch(() => undefined);
+    }
+  }
+
+  private async createFromArtifact(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview> {
+    const lifetime = input.lifetimeMinutes ?? this.config.ttlDefaultMinutes;
+    if (!Number.isInteger(lifetime) || lifetime < this.config.ttlMinMinutes || lifetime > this.config.ttlMaxMinutes) throw new Error('INVALID_TTL');
+    const id = createPreviewId();
+    const hostname = `${id}.${this.config.previewDomainSuffix}`;
+    const expiresAt = new Date(Date.now() + lifetime * 60_000);
+    await this.repository.create({ id, ownerUserId: input.ownerUserId, hostname, expiresAt, sourceType: input.sourceType, displayName: input.displayName ?? null });
+    let stagingKey: Awaited<ReturnType<ArchiveImporter['importFromFile']>>['stagingKey'] | undefined;
+    try {
+      const imported = await this.importer.importFromFile(input.archivePath);
+      stagingKey = imported.stagingKey;
+      await this.publisher.publish(id, stagingKey);
+      const digest = await sha256File(input.archivePath);
+      return await this.repository.markReady(id, { compressedSizeBytes: imported.artifact.compressedSizeBytes, extractedSizeBytes: imported.artifact.extractedSizeBytes, fileCount: imported.artifact.fileCount, sourceSha256: digest });
+    } catch (error) {
+      await this.repository.markFailed(id, error instanceof Error ? error.message.slice(0, 120) : 'IMPORT_FAILED').catch(() => undefined);
+      throw error;
+    } finally {
+      if (stagingKey) await this.store.deleteStagingArea(stagingKey).catch(() => undefined);
+    }
+  }
+
+  async updateFromFile(input: { ownerUserId: string; previewId: string; archivePath: string }): Promise<Preview | null> {
+    return this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ...input, sourceType: 'UPLOAD' }));
+  }
+
+  async updateFromUrl(input: { ownerUserId: string; previewId: string; sourceUrl: string }): Promise<Preview | null> {
+    const fetched = await this.urlSource.fetch(input.sourceUrl);
+    try {
+      return await this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ownerUserId: input.ownerUserId, previewId: input.previewId, archivePath: fetched.archivePath, sourceType: 'URL' }));
+    } finally {
+      await fetched.cleanup().catch(() => undefined);
+    }
+  }
+
+  private async updateFromArtifact(input: { ownerUserId: string; previewId: string; archivePath: string; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview | null> {
+    const current = await this.repository.findOwnedById(input.ownerUserId, input.previewId);
+    if (!current || current.status !== 'READY') return null;
+    let stagingKey: StagingKey | undefined;
+    try {
+      const imported = await this.importer.importFromFile(input.archivePath);
+      stagingKey = imported.stagingKey;
+      const replacement = await this.publisher.prepareReplacement(input.previewId, stagingKey);
+      try {
+        const digest = await sha256File(input.archivePath);
+        const updated = await this.repository.markUpdatedOwned(input.ownerUserId, input.previewId, {
+          compressedSizeBytes: imported.artifact.compressedSizeBytes,
+          extractedSizeBytes: imported.artifact.extractedSizeBytes,
+          fileCount: imported.artifact.fileCount,
+          sourceSha256: digest,
+          sourceType: input.sourceType,
+        });
+        if (!updated) {
+          await replacement.rollback();
+          return null;
+        }
+        await replacement.commit();
+        return updated;
+      } catch (error) {
+        await replacement.rollback().catch(() => undefined);
+        throw error;
+      }
+    } finally {
+      if (stagingKey) await this.store.deleteStagingArea(stagingKey).catch(() => undefined);
+    }
+  }
+
+  private async withUpdateLock<T>(previewId: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.updateLocks.get(previewId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const chain = previous.then(() => gate);
+    this.updateLocks.set(previewId, chain);
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.updateLocks.get(previewId) === chain) this.updateLocks.delete(previewId);
+    }
+  }
+
+  async listOwned(ownerUserId: string): Promise<Preview[]> {
+    return this.repository.listOwned(ownerUserId);
+  }
+
+  async getOwned(ownerUserId: string, previewId: string): Promise<Preview | null> {
+    const preview = await this.repository.findOwnedById(ownerUserId, previewId);
+    if (!preview || preview.status === 'DELETED') return null;
+    return preview;
+  }
+
+  async extendOwned(ownerUserId: string, previewId: string, lifetimeMinutes: number): Promise<Preview | null> {
+    if (!Number.isInteger(lifetimeMinutes) || lifetimeMinutes < this.config.ttlMinMinutes || lifetimeMinutes > this.config.ttlMaxMinutes) {
+      throw new Error('INVALID_TTL');
+    }
+    const current = await this.repository.findOwnedById(ownerUserId, previewId);
+    if (!current || ['DELETED','DELETING','EXPIRED'].includes(current.status)) return null;
+    const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
+    if (expiresAt <= current.expiresAt) throw new Error('INVALID_EXTENSION');
+    return this.repository.extendOwned(ownerUserId, previewId, expiresAt);
+  }
+
+  async deleteOwned(ownerUserId: string, previewId: string): Promise<boolean> {
+    const preview = await this.repository.markDeletingOwned(ownerUserId, previewId);
+    if (!preview) {
+      const existing = await this.repository.findOwnedById(ownerUserId, previewId);
+      return existing?.status === 'DELETED';
+    }
+    await this.store.deletePreviewArea(previewStorageKey(previewId));
+    await this.repository.markDeletedOwned(ownerUserId, previewId);
+    return true;
+  }
+
+}

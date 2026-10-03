@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    environment:
+      PORT: 3000
+      CONTROL_PLANE_HOST: localhost
+      PREVIEW_DOMAIN_SUFFIX: preview.localhost
+      DATABASE_URL: postgres://pwa_preview:pwa_preview@postgres:5432/pwa_preview
+      DATA_ROOT: /data
+      SESSION_SECRET: local-development-secret-change-me-000000000
+      GITHUB_CLIENT_ID: local-placeholder
+      GITHUB_CLIENT_SECRET: local-placeholder
+    ports:
+      - "3000:3000"
+    volumes:
+      - preview-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pwa_preview
+      POSTGRES_USER: pwa_preview
+      POSTGRES_PASSWORD: pwa_preview
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pwa_preview -d pwa_preview"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+volumes:
+  postgres-data:
+  preview-data:
