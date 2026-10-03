@@ -142,7 +142,9 @@ Tools: `preview_create`, `preview_list`, `preview_get`, `preview_update`, `previ
 
 ## Production deployment
 
-Production deployment is designed for Coolify/Traefik. Use `compose.coolify.yaml` for production; it starts only pwa-preview, keeps `/data` persistent, and expects an external/shared PostgreSQL database through `DATABASE_URL`. The ordinary `compose.yaml` remains the self-contained local-development stack with PostgreSQL included.
+Production deployment is designed for Coolify/Traefik. Use `compose.coolify.yaml` for production; it pulls `ghcr.io/erland/pwa-preview:<version>`, starts only pwa-preview, keeps `/data` persistent, and expects an external/shared PostgreSQL database through `DATABASE_URL`. The ordinary `compose.yaml` remains the self-contained local-development stack with PostgreSQL included.
+
+Publishing a GitHub Release builds and pushes the production image on GitHub Actions for both `linux/amd64` and `linux/arm64`, so Coolify does not spend server resources compiling or building the image. Set `PWA_PREVIEW_VERSION` in Coolify to the desired release tag/version.
 
 Both the control-plane hostname and preview wildcard suffix are configurable through `CONTROL_PLANE_HOST` and `PREVIEW_DOMAIN_SUFFIX`; the application does not depend on specific DNS names.
 
