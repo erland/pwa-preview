@@ -10,7 +10,7 @@ afterEach(async () => { while (dirs.length) await rm(dirs.pop()!, { recursive:tr
 
 function config(dataRoot:string): AppConfig {
   return {
-    controlPlaneHost:'control.example.com', previewDomainSuffix:'preview.example.com', databaseUrl:'postgres://unused', dataRoot,
+    controlPlaneHost:'control.example.com', controlPlaneRegistrableDomain:'example.com', controlPlaneRegistrableDomain:'example.com', previewDomainSuffix:'preview.example.net', databaseUrl:'postgres://unused', dataRoot,
     sessionSecret:'x'.repeat(32), githubClientId:'id', githubClientSecret:'secret', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
     maxCompressedBytes:1, maxExtractedBytes:1, maxFileCount:1, maxPathLength:1024, urlFetchTimeoutMs:1000, maxRedirects:1,
       maxActivePreviewsPerUser: 20,
