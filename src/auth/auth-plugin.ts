@@ -49,7 +49,16 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
   app.decorateRequest('authContext', null);
   app.addHook('preHandler', async (request) => {
     const userId = request.session.get('userId');
-    request.authContext = typeof userId === 'string' ? { userId } : null;
+    if (typeof userId !== 'string') {
+      request.authContext = null;
+      return;
+    }
+    if (!(await users.isUserAllowed(userId))) {
+      request.session.delete();
+      request.authContext = null;
+      return;
+    }
+    request.authContext = { userId };
   });
 
   app.get('/auth/login/github', async (request, reply) => {
