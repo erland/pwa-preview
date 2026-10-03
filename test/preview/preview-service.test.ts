@@ -19,6 +19,7 @@ function config(root:string): AppConfig { return {
   controlPlaneHost:'pwa-preview.apps.isaksson.info', previewDomainSuffix:'previewapp.apphome.one', databaseUrl:'postgres://x', dataRoot:root,
   sessionSecret:'x'.repeat(32), githubClientId:'x', githubClientSecret:'x', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
   maxCompressedBytes:100*1024*1024, maxExtractedBytes:500*1024*1024, maxFileCount:20000, maxPathLength:1024, urlFetchTimeoutMs:30000, maxRedirects:5,
+  cleanupIntervalMs:60000, reconciliationIntervalMs:600000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
 }; }
 
 class FakeRepo {
