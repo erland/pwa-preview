@@ -26,6 +26,16 @@ services:
       RECONCILIATION_INTERVAL_MS: ${RECONCILIATION_INTERVAL_MS:-600000}
       STALE_OPERATION_MINUTES: ${STALE_OPERATION_MINUTES:-30}
       STALE_STAGING_MINUTES: ${STALE_STAGING_MINUTES:-60}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pwa-preview-wildcard.rule=HostRegexp(`[a-z0-9-]+\\.${PREVIEW_DOMAIN_SUFFIX}`)"
+      - "traefik.http.routers.pwa-preview-wildcard.entrypoints=https"
+      - "traefik.http.routers.pwa-preview-wildcard.tls=true"
+      - "traefik.http.routers.pwa-preview-wildcard.tls.certresolver=desec"
+      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].main=${PREVIEW_DOMAIN_SUFFIX}"
+      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].sans=*.${PREVIEW_DOMAIN_SUFFIX}"
+      - "traefik.http.routers.pwa-preview-wildcard.service=pwa-preview-wildcard"
+      - "traefik.http.services.pwa-preview-wildcard.loadbalancer.server.port=3000"
     expose:
       - "3000"
     volumes:
