@@ -34,6 +34,21 @@ export class PreviewRepository {
     return Number(result.rows[0]?.count ?? 0);
   }
 
+  async sumReadyExtractedBytesOwned(ownerUserId: string): Promise<number> {
+    const result = await this.pool.query<{ bytes: string }>(
+      "SELECT coalesce(sum(extracted_size_bytes),0)::text AS bytes FROM previews WHERE owner_user_id = $1 AND status = 'READY'",
+      [ownerUserId],
+    );
+    return Number(result.rows[0]?.bytes ?? 0);
+  }
+
+  async sumReadyExtractedBytesTotal(): Promise<number> {
+    const result = await this.pool.query<{ bytes: string }>(
+      "SELECT coalesce(sum(extracted_size_bytes),0)::text AS bytes FROM previews WHERE status = 'READY'",
+    );
+    return Number(result.rows[0]?.bytes ?? 0);
+  }
+
   async listOwned(ownerUserId: string): Promise<Preview[]> {
     const result = await this.pool.query(
       "SELECT * FROM previews WHERE owner_user_id = $1 AND status <> 'DELETED' ORDER BY created_at DESC",

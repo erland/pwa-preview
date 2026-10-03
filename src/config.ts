@@ -17,6 +17,8 @@ export type AppConfig = Readonly<{
   maxRedirects: number;
   maxActivePreviewsPerUser: number;
   maxConcurrentImportsPerUser: number;
+  maxStorageBytesPerUser: number;
+  maxStorageBytesTotal: number;
   cleanupIntervalMs: number;
   reconciliationIntervalMs: number;
   staleOperationMinutes: number;
@@ -101,6 +103,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
     maxRedirects: positiveInt(env, 'MAX_REDIRECTS', 5),
     maxActivePreviewsPerUser: positiveInt(env, 'MAX_ACTIVE_PREVIEWS_PER_USER', 20),
     maxConcurrentImportsPerUser: positiveInt(env, 'MAX_CONCURRENT_IMPORTS_PER_USER', 2),
+    maxStorageBytesPerUser: positiveInt(env, 'MAX_STORAGE_BYTES_PER_USER', 2 * 1024 * MIB),
+    maxStorageBytesTotal: positiveInt(env, 'MAX_STORAGE_BYTES_TOTAL', 20 * 1024 * MIB),
     cleanupIntervalMs: positiveInt(env, 'CLEANUP_INTERVAL_MS', 60_000),
     reconciliationIntervalMs: positiveInt(env, 'RECONCILIATION_INTERVAL_MS', 10 * 60_000),
     staleOperationMinutes: positiveInt(env, 'STALE_OPERATION_MINUTES', 30),
@@ -125,6 +129,8 @@ export function safeConfigSummary(config: AppConfig): Record<string, string | nu
     maxRedirects: config.maxRedirects,
     maxActivePreviewsPerUser: config.maxActivePreviewsPerUser,
     maxConcurrentImportsPerUser: config.maxConcurrentImportsPerUser,
+    maxStorageBytesPerUser: config.maxStorageBytesPerUser,
+    maxStorageBytesTotal: config.maxStorageBytesTotal,
     cleanupIntervalMs: config.cleanupIntervalMs,
     reconciliationIntervalMs: config.reconciliationIntervalMs,
     staleOperationMinutes: config.staleOperationMinutes,

@@ -15,6 +15,7 @@ function config(dataRoot:string): AppConfig {
     maxCompressedBytes:1, maxExtractedBytes:1, maxFileCount:1, maxPathLength:1024, urlFetchTimeoutMs:1000, maxRedirects:1,
       maxActivePreviewsPerUser: 20,
       maxConcurrentImportsPerUser: 2,
+  maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,
     cleanupIntervalMs:1000, reconciliationIntervalMs:1000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
   };
 }

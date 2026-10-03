@@ -36,8 +36,10 @@ The configured minimum must be positive, default must lie within min/max, and ma
 - `MAX_PATH_LENGTH`: default `1024`
 - `MAX_ACTIVE_PREVIEWS_PER_USER`: default `20`
 - `MAX_CONCURRENT_IMPORTS_PER_USER`: default `2`
+- `MAX_STORAGE_BYTES_PER_USER`: default `2147483648` (2 GiB)
+- `MAX_STORAGE_BYTES_TOTAL`: default `21474836480` (20 GiB)
 
-Archive limits are enforced during import before content reaches a live preview. The per-user active-preview quota counts `CREATING` and `READY` previews. The per-user import concurrency limit applies across REST and MCP within the single active application process; excess operations fail fast.
+Archive limits are enforced during import before content reaches a live preview. The per-user active-preview quota counts `CREATING` and `READY` previews. The per-user import concurrency limit applies across REST and MCP within the single active application process; excess operations fail fast. Storage quotas are calculated from the extracted size of `READY` previews. New previews and updates are checked before publication; updates charge only the positive size increase over the content they replace. Quota checks are serialized process-wide, matching the v1 single-active-instance deployment model.
 
 ## URL import
 

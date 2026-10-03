@@ -9,6 +9,7 @@ const config: AppConfig = {
   ttlMinMinutes: 5, ttlDefaultMinutes: 30, ttlMaxMinutes: 1440, maxCompressedBytes: 1, maxExtractedBytes: 2,
   maxFileCount: 3, maxPathLength: 1024, urlFetchTimeoutMs: 30000, maxRedirects: 5,
   maxActivePreviewsPerUser:20, maxConcurrentImportsPerUser:2,
+  maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,
   cleanupIntervalMs: 60000, reconciliationIntervalMs: 600000, staleOperationMinutes: 30, staleStagingMinutes: 60, migrateOnStart: true,
 };
 

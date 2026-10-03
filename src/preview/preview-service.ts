@@ -12,6 +12,7 @@ import { UrlArtifactSource } from '../artifact/url-artifact-source.js';
 
 const importCounts = new Map<string, number>();
 const createLocks = new Map<string, Promise<void>>();
+let storageQuotaTail: Promise<void> = Promise.resolve();
 
 async function withImportPermit<T>(userId: string, limit: number, work: () => Promise<T>): Promise<T> {
   const active = importCounts.get(userId) ?? 0;
@@ -38,6 +39,19 @@ async function withCreateLock<T>(userId: string, work: () => Promise<T>): Promis
   } finally {
     release();
     if (createLocks.get(userId) === chain) createLocks.delete(userId);
+  }
+}
+
+async function withStorageQuotaLock<T>(work: () => Promise<T>): Promise<T> {
+  const previous = storageQuotaTail;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  storageQuotaTail = previous.then(() => gate);
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
   }
 }
 
@@ -106,9 +120,12 @@ export class PreviewService {
     try {
       const imported = await this.importer.importFromFile(input.archivePath);
       stagingKey = imported.stagingKey;
-      await this.publisher.publish(id, stagingKey);
       const digest = await sha256File(input.archivePath);
-      return await this.repository.markReady(id, { compressedSizeBytes: imported.artifact.compressedSizeBytes, extractedSizeBytes: imported.artifact.extractedSizeBytes, fileCount: imported.artifact.fileCount, sourceSha256: digest });
+      return await withStorageQuotaLock(async () => {
+        await this.assertStorageCapacity(input.ownerUserId, imported.artifact.extractedSizeBytes, 0);
+        await this.publisher.publish(id, stagingKey!);
+        return await this.repository.markReady(id, { compressedSizeBytes: imported.artifact.compressedSizeBytes, extractedSizeBytes: imported.artifact.extractedSizeBytes, fileCount: imported.artifact.fileCount, sourceSha256: digest });
+      });
     } catch (error) {
       await this.repository.markFailed(id, error instanceof Error ? error.message.slice(0, 120) : 'IMPORT_FAILED').catch(() => undefined);
       throw error;
@@ -140,26 +157,29 @@ export class PreviewService {
     try {
       const imported = await this.importer.importFromFile(input.archivePath);
       stagingKey = imported.stagingKey;
-      const replacement = await this.publisher.prepareReplacement(input.previewId, stagingKey);
-      try {
-        const digest = await sha256File(input.archivePath);
-        const updated = await this.repository.markUpdatedOwned(input.ownerUserId, input.previewId, {
-          compressedSizeBytes: imported.artifact.compressedSizeBytes,
-          extractedSizeBytes: imported.artifact.extractedSizeBytes,
-          fileCount: imported.artifact.fileCount,
-          sourceSha256: digest,
-          sourceType: input.sourceType,
-        });
-        if (!updated) {
-          await replacement.rollback();
-          return null;
+      const digest = await sha256File(input.archivePath);
+      return await withStorageQuotaLock(async () => {
+        await this.assertStorageCapacity(input.ownerUserId, imported.artifact.extractedSizeBytes, current.extractedSizeBytes ?? 0);
+        const replacement = await this.publisher.prepareReplacement(input.previewId, stagingKey!);
+        try {
+          const updated = await this.repository.markUpdatedOwned(input.ownerUserId, input.previewId, {
+            compressedSizeBytes: imported.artifact.compressedSizeBytes,
+            extractedSizeBytes: imported.artifact.extractedSizeBytes,
+            fileCount: imported.artifact.fileCount,
+            sourceSha256: digest,
+            sourceType: input.sourceType,
+          });
+          if (!updated) {
+            await replacement.rollback();
+            return null;
+          }
+          await replacement.commit();
+          return updated;
+        } catch (error) {
+          await replacement.rollback().catch(() => undefined);
+          throw error;
         }
-        await replacement.commit();
-        return updated;
-      } catch (error) {
-        await replacement.rollback().catch(() => undefined);
-        throw error;
-      }
+      });
     } finally {
       if (stagingKey) await this.store.deleteStagingArea(stagingKey).catch(() => undefined);
     }
@@ -183,6 +203,17 @@ export class PreviewService {
   private async assertActivePreviewCapacity(ownerUserId: string): Promise<void> {
     const count = await this.repository.countActiveOwned(ownerUserId);
     if (count >= this.config.maxActivePreviewsPerUser) throw new Error('ACTIVE_PREVIEW_LIMIT');
+  }
+
+  private async assertStorageCapacity(ownerUserId: string, incomingBytes: number, replacedBytes: number): Promise<void> {
+    const delta = Math.max(0, incomingBytes - replacedBytes);
+    if (delta === 0) return;
+    const [ownedBytes, totalBytes] = await Promise.all([
+      this.repository.sumReadyExtractedBytesOwned(ownerUserId),
+      this.repository.sumReadyExtractedBytesTotal(),
+    ]);
+    if (ownedBytes + delta > this.config.maxStorageBytesPerUser) throw new Error('USER_STORAGE_QUOTA_LIMIT');
+    if (totalBytes + delta > this.config.maxStorageBytesTotal) throw new Error('TOTAL_STORAGE_QUOTA_LIMIT');
   }
 
   async listOwned(ownerUserId: string): Promise<Preview[]> {
