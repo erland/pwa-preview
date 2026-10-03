@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import * as tar from 'tar-stream';
+import type { Header } from 'tar-stream';
 import yazl from 'yazl';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ArchiveImporter } from '../../src/artifact/archive-importer.js';
@@ -17,7 +18,7 @@ async function fixture(limits: {maxCompressedBytes:number;maxExtractedBytes:numb
   return {root, importer:new ArchiveImporter(store,limits)};
 }
 async function zip(file:string, content:string){ const z=new yazl.ZipFile(); z.addBuffer(Buffer.from('<h1>x</h1>'),'index.html'); z.addBuffer(Buffer.from(content),'big.txt'); z.end(); await new Promise<void>((resolve,reject)=>z.outputStream.pipe(createWriteStream(file)).on('close',resolve).on('error',reject)); }
-async function tarGz(file:string, type:tar.Headers['type']){ const p=tar.pack(); const chunks:Buffer[]=[]; p.on('data',c=>chunks.push(Buffer.from(c))); const done=new Promise<void>((resolve,reject)=>p.on('end',resolve).on('error',reject)); await new Promise<void>((resolve,reject)=>p.entry({name:'index.html',type:'file'},'ok',e=>e?reject(e):resolve())); await new Promise<void>((resolve,reject)=>p.entry({name:'danger',type,linkname:'index.html'},'',e=>e?reject(e):resolve())); p.finalize(); await done; await writeFile(file,gzipSync(Buffer.concat(chunks))); }
+async function tarGz(file:string, type:Header['type']){ const p=tar.pack(); const chunks:Buffer[]=[]; p.on('data',(c:Buffer)=>chunks.push(Buffer.from(c))); const done=new Promise<void>((resolve,reject)=>p.on('end',resolve).on('error',reject)); await new Promise<void>((resolve,reject)=>p.entry({name:'index.html',type:'file'},'ok',e=>e?reject(e):resolve())); await new Promise<void>((resolve,reject)=>p.entry({name:'danger',type,linkname:'index.html'},'',e=>e?reject(e):resolve())); p.finalize(); await done; await writeFile(file,gzipSync(Buffer.concat(chunks))); }
 
 describe('release security: archive limits and special entries',()=>{
   const base={maxCompressedBytes:1024*1024,maxExtractedBytes:1024*1024,maxFileCount:100,maxPathLength:1024};
