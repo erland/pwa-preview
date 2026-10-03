@@ -19,6 +19,12 @@ export class UserService {
     this.users = new UserRepository(pool);
   }
 
+  async isUserAllowed(userId: string): Promise<boolean> {
+    const identity = await this.identities.findByUserProvider(userId, 'github');
+    if (!identity?.email || !identity.emailVerified) return false;
+    return this.allowlist.isAllowed(identity.email, 'github');
+  }
+
   async loginWithGithub(identity: GithubIdentity): Promise<{ userId: string }> {
     if (!identity.emailVerified || !(await this.allowlist.isAllowed(identity.email, 'github'))) {
       throw new AccessDeniedError();
