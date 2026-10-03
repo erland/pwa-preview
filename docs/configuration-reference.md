@@ -34,8 +34,10 @@ The configured minimum must be positive, default must lie within min/max, and ma
 - `MAX_EXTRACTED_BYTES`: default `524288000` (500 MiB)
 - `MAX_FILE_COUNT`: default `20000`
 - `MAX_PATH_LENGTH`: default `1024`
+- `MAX_ACTIVE_PREVIEWS_PER_USER`: default `20`
+- `MAX_CONCURRENT_IMPORTS_PER_USER`: default `2`
 
-These limits are enforced during archive import before content reaches a live preview.
+Archive limits are enforced during import before content reaches a live preview. The per-user active-preview quota counts `CREATING` and `READY` previews. The per-user import concurrency limit applies across REST and MCP within the single active application process; excess operations fail fast.
 
 ## URL import
 
