@@ -35,6 +35,14 @@ export class IdentityRepository {
     );
     return result.rows[0] ? mapIdentity(result.rows[0]) : null;
   }
+
+  async findByUserProvider(userId: string, provider: string): Promise<ExternalIdentity | null> {
+    const result = await this.pool.query(
+      'SELECT * FROM external_identities WHERE user_id = $1 AND provider = $2 ORDER BY created_at LIMIT 1',
+      [userId, provider],
+    );
+    return result.rows[0] ? mapIdentity(result.rows[0]) : null;
+  }
 }
 
 function mapIdentity(row: Record<string, unknown>): ExternalIdentity {
