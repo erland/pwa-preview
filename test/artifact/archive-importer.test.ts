@@ -22,7 +22,7 @@ async function zipFile(file: string, entries: Array<{name:string, content:string
 }
 async function tarGzFile(file: string, entries: Array<{name:string, content?:string, type?:Header['type'], linkname?:string}>) {
   const pack = tar.pack(); const chunks: Buffer[]=[];
-  pack.on('data',(c: Buffer)=>chunks.push(Buffer.from(c)));
+  pack.on('data',(c: unknown)=>{ chunks.push(Buffer.from(c as Uint8Array)); });
   const done=new Promise<void>((resolve,reject)=>pack.on('end',resolve).on('error',reject));
   for (const e of entries) await new Promise<void>((resolve,reject)=>pack.entry({name:e.name,type:e.type ?? 'file',...(e.linkname ? {linkname:e.linkname} : {})},e.content ?? '',(err)=>err?reject(err):resolve()));
   pack.finalize(); await done; await writeFile(file,gzipSync(Buffer.concat(chunks)));
