@@ -53,6 +53,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate Coolify Compose
+        env:
+          CONTROL_PLANE_HOST: pwa-preview.example.test
+          PREVIEW_DOMAIN_SUFFIX: preview.example.test
+          DATABASE_URL: postgres://pwa_preview:test@postgres.example.test:5432/pwa_preview
+          SESSION_SECRET: ci-session-secret-that-is-at-least-32-characters
+          GITHUB_CLIENT_ID: ci-client
+          GITHUB_CLIENT_SECRET: ci-secret
+        run: docker compose -f compose.coolify.yaml config --quiet
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
