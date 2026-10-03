@@ -4,7 +4,7 @@ import type { AppConfig } from '../../src/config.js';
 import type { DatabasePool } from '../../src/persistence/db.js';
 
 const config: AppConfig = {
-  controlPlaneHost: 'pwa-preview.example.net', controlPlaneRegistrableDomain: 'example.com', controlPlaneRegistrableDomain:'example.com', previewDomainSuffix: 'preview.example.net', databaseUrl: 'postgres://unused', dataRoot: '/tmp/pwa-preview-auth-test',
+  controlPlaneHost: 'pwa-preview.example.com', controlPlaneRegistrableDomain: 'example.com', previewDomainSuffix: 'preview.example.net', databaseUrl: 'postgres://unused', dataRoot: '/tmp/pwa-preview-auth-test',
   sessionSecret: '0123456789012345678901234567890123456789', githubClientId: 'client', githubClientSecret: 'secret',
   ttlMinMinutes: 5, ttlDefaultMinutes: 30, ttlMaxMinutes: 1440, maxCompressedBytes: 1, maxExtractedBytes: 2,
   maxFileCount: 3, maxPathLength: 1024, urlFetchTimeoutMs: 30000, maxRedirects: 5,
@@ -23,7 +23,7 @@ describe('auth routes', () => {
     const location = new URL(response.headers.location!);
     expect(location.origin + location.pathname).toBe('https://github.com/login/oauth/authorize');
     expect(location.searchParams.get('scope')).toBe('read:user user:email');
-    expect(location.searchParams.get('redirect_uri')).toBe('https://pwa-preview.example.net/auth/callback/github');
+    expect(location.searchParams.get('redirect_uri')).toBe('https://pwa-preview.example.com/auth/callback/github');
     const cookie = response.headers['set-cookie'];
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('Secure');
