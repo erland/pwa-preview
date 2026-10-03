@@ -60,6 +60,6 @@ WHERE lower(email) = lower('user@example.com')
   AND coalesce(provider, '') = 'github';
 ```
 
-Disabling an allowlist entry prevents future GitHub login and causes MCP Bearer-token authentication for that identity to fail on subsequent requests.
+Disabling an allowlist entry prevents future GitHub login and causes both existing browser sessions and MCP Bearer-token authentication for that identity to fail on subsequent authenticated requests. A browser session that no longer passes the allowlist check is deleted immediately.
 
 Operators should use a database account/process appropriate for their environment and should not expose these statements as unauthenticated application endpoints.
