@@ -44,11 +44,41 @@ Only these host classes are accepted by the application. Unknown hosts return 40
 
 ## DNS and TLS
 
-Create a wildcard DNS record for `*.<PREVIEW_DOMAIN_SUFFIX>` pointing at the Coolify/Traefik ingress. Configure the reverse proxy with both `<CONTROL_PLANE_HOST>` and `*.<PREVIEW_DOMAIN_SUFFIX>` on the same application service.
+Create DNS records for both the preview base host and wildcard host, pointing at the Coolify/Traefik ingress. With `PREVIEW_DOMAIN_SUFFIX=preview.apphome.one` this is:
 
-The wildcard certificate must be issued with a DNS-01 challenge. HTTP-01 cannot issue a wildcard certificate. Configure the DNS-provider credentials in Coolify/Traefik, not in the pwa-preview container.
+```text
+A/AAAA  preview.apphome.one    -> Coolify server
+A/AAAA  *.preview.apphome.one  -> Coolify server
+```
 
-The application listens on port 3000 over plain HTTP inside the deployment network. TLS terminates at Coolify/Traefik.
+Do not enter `https://*.preview.apphome.one` in Coolify's ordinary Domains field. Keep that field for the concrete control-plane URL, for example `https://pwa-preview.apps.isaksson.info`.
+
+`compose.coolify.yaml` carries the wildcard preview router as Traefik labels. It matches hosts below `PREVIEW_DOMAIN_SUFFIX`, forwards them to port 3000, and requests TLS through a Traefik certificate resolver named `desec`.
+
+The server's Traefik proxy must therefore have a `desec` DNS-01 resolver configured. The deSEC API token belongs in the Traefik proxy environment, not in the pwa-preview application container.
+
+Example Traefik static configuration additions:
+
+```yaml
+environment:
+  - DESEC_TOKEN=<deSEC token>
+
+command:
+  - '--certificatesresolvers.desec.acme.email=<email>'
+  - '--certificatesresolvers.desec.acme.storage=/traefik/acme-desec.json'
+  - '--certificatesresolvers.desec.acme.dnschallenge.provider=desec'
+```
+
+Keep Coolify's existing certificate resolver configuration as-is; the `desec` resolver is additional. Restart the proxy after changing its static configuration.
+
+For `PREVIEW_DOMAIN_SUFFIX=preview.apphome.one`, the compose labels request a certificate covering:
+
+```text
+preview.apphome.one
+*.preview.apphome.one
+```
+
+DNS-01 is required for the wildcard certificate. TLS terminates at Traefik; the application listens on port 3000 over plain HTTP inside the deployment network.
 
 ## Persistent services
 
@@ -148,7 +178,7 @@ After deploy, verify:
 3. GitHub OAuth redirects back to the exact control-plane callback.
 4. `Set-Cookie` for `pwa_preview_session` has `Secure`, `HttpOnly`, suitable `SameSite`, and no `Domain` attribute.
 5. `/api/*`, `/auth/*`, UI and `/mcp` are usable on the control host.
-6. Two different random `p-...previewapp.apphome.one` hosts route to the same service without adding proxy rules.
+6. Two different random `p-...<PREVIEW_DOMAIN_SUFFIX>` hosts route to the same service without adding proxy rules.
 7. The wildcard certificate is valid for both random preview hosts.
 8. An unknown or invalid preview host returns 404 and never exposes the control-plane UI/API.
 9. A completely unrelated Host header returns 404.
@@ -175,3 +205,25 @@ ghcr.io/erland/pwa-preview:latest
 ```
 
 `latest` is only updated for non-prerelease releases. Coolify should normally pin `PWA_PREVIEW_VERSION` to the exact release version. After publishing a new release, change that variable (or otherwise trigger the desired Coolify redeploy) so Coolify pulls the already-built image.
+
+
+## Wildcard routing ownership
+
+The responsibilities are intentionally split:
+
+```text
+DNS provider
+  -> *.PREVIEW_DOMAIN_SUFFIX resolves to the Coolify server
+
+Coolify / Traefik
+  -> HostRegexp wildcard router from compose.coolify.yaml
+  -> DNS-01 certificate through resolver "desec"
+  -> forwards to pwa-preview:3000
+
+pwa-preview
+  -> validates Host again against PREVIEW_DOMAIN_SUFFIX
+  -> resolves the preview ID
+  -> serves only READY, unexpired static content
+```
+
+This means new preview hostnames require no per-preview DNS or Coolify configuration.
