@@ -134,7 +134,7 @@ e2e('full E2E', () => {
 
   function config(): AppConfig {
     return {
-      controlPlaneHost: 'control.example.test', controlPlaneRegistrableDomain: 'example.test', controlPlaneRegistrableDomain:'example.com',
+      controlPlaneHost: 'control.example.test', controlPlaneRegistrableDomain: 'example.test',
       previewDomainSuffix: 'preview.example-preview.test',
       databaseUrl: databaseUrl!,
       dataRoot: path.join(tempRoot, 'data'),
