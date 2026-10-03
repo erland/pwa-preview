@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22.23.3-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY src ./src
 COPY ui ./ui
 RUN npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:22.23.3-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package*.json ./
