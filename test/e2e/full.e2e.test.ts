@@ -152,6 +152,7 @@ e2e('full E2E', () => {
       maxRedirects: 2,
       maxActivePreviewsPerUser: 20,
       maxConcurrentImportsPerUser: 2,
+  maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,
       cleanupIntervalMs: 1000,
       reconciliationIntervalMs: 5000,
       staleOperationMinutes: 1,
