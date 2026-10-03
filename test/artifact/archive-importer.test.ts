@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import * as tar from 'tar-stream';
+import type { Header } from 'tar-stream';
 import yazl from 'yazl';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ArchiveImporter } from '../../src/artifact/archive-importer.js';
@@ -19,11 +20,11 @@ async function zipFile(file: string, entries: Array<{name:string, content:string
   for (const e of entries) zip.addBuffer(Buffer.from(e.content), e.name, e.mode ? { mode: e.mode } : undefined);
   zip.end(); await new Promise<void>((resolve,reject)=>{ zip.outputStream.pipe(createWriteStream(file)).on('close',resolve).on('error',reject); });
 }
-async function tarGzFile(file: string, entries: Array<{name:string, content?:string, type?:tar.Headers['type'], linkname?:string}>) {
+async function tarGzFile(file: string, entries: Array<{name:string, content?:string, type?:Header['type'], linkname?:string}>) {
   const pack = tar.pack(); const chunks: Buffer[]=[];
-  pack.on('data',(c)=>chunks.push(Buffer.from(c)));
+  pack.on('data',(c: Buffer)=>chunks.push(Buffer.from(c)));
   const done=new Promise<void>((resolve,reject)=>pack.on('end',resolve).on('error',reject));
-  for (const e of entries) await new Promise<void>((resolve,reject)=>pack.entry({name:e.name,type:e.type ?? 'file',linkname:e.linkname},e.content ?? '',(err)=>err?reject(err):resolve()));
+  for (const e of entries) await new Promise<void>((resolve,reject)=>pack.entry({name:e.name,type:e.type ?? 'file',...(e.linkname ? {linkname:e.linkname} : {})},e.content ?? '',(err)=>err?reject(err):resolve()));
   pack.finalize(); await done; await writeFile(file,gzipSync(Buffer.concat(chunks)));
 }
 
