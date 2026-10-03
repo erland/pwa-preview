@@ -64,14 +64,16 @@ describe('PreviewService', () => {
     const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-service-'));
     const store=new LocalVolumeObjectStore(path.join(root,'data')); await store.initialize();
     let releaseCreate!: () => void;
+    let signalCreateStarted!: () => void;
     const createGate=new Promise<void>((resolve)=>{ releaseCreate=resolve; });
+    const createStarted=new Promise<void>((resolve)=>{ signalCreateStarted=resolve; });
     const repo=new FakeRepo();
     const originalCreate=repo.create.bind(repo);
-    repo.create=async (input:any) => { const created=await originalCreate(input); await createGate; return created; };
+    repo.create=async (input:any) => { const created=await originalCreate(input); signalCreateStarted(); await createGate; return created; };
     const limited={...config(path.join(root,'data')),maxConcurrentImportsPerUser:1};
     const service=new PreviewService(limited, repo as unknown as PreviewRepository, store);
     const first=service.createFromFile({ownerUserId:'owner-a',archivePath:'/missing'});
-    await new Promise((resolve)=>setTimeout(resolve,10));
+    await createStarted;
     await expect(service.createFromFile({ownerUserId:'owner-a',archivePath:'/missing'})).rejects.toThrow('IMPORT_CONCURRENCY_LIMIT');
     releaseCreate();
     await expect(first).rejects.toThrow();
