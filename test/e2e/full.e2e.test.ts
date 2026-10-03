@@ -150,6 +150,8 @@ e2e('full E2E', () => {
       maxPathLength: 512,
       urlFetchTimeoutMs: 1000,
       maxRedirects: 2,
+      maxActivePreviewsPerUser: 20,
+      maxConcurrentImportsPerUser: 2,
       cleanupIntervalMs: 1000,
       reconciliationIntervalMs: 5000,
       staleOperationMinutes: 1,
