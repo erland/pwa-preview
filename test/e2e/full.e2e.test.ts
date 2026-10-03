@@ -134,8 +134,8 @@ e2e('full E2E', () => {
 
   function config(): AppConfig {
     return {
-      controlPlaneHost: 'control.example.test',
-      previewDomainSuffix: 'preview.example.test',
+      controlPlaneHost: 'control.example.test', controlPlaneRegistrableDomain: 'example.test', controlPlaneRegistrableDomain:'example.com',
+      previewDomainSuffix: 'preview.example-preview.test',
       databaseUrl: databaseUrl!,
       dataRoot: path.join(tempRoot, 'data'),
       sessionSecret: 'e2e-session-secret-that-is-at-least-32-characters',
