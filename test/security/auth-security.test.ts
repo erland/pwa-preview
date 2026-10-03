@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app.js';
 import type { AppConfig } from '../../src/config.js';
 
-const config:AppConfig={controlPlaneHost:'control.example.com',previewDomainSuffix:'preview.example.com',databaseUrl:'postgres://x',dataRoot:'/tmp/pwa-preview-auth-security',sessionSecret:'s'.repeat(32),githubClientId:'client',githubClientSecret:'secret',ttlMinMinutes:5,ttlDefaultMinutes:30,ttlMaxMinutes:1440,maxCompressedBytes:100000,maxExtractedBytes:500000,maxFileCount:100,maxPathLength:1024,urlFetchTimeoutMs:30000,maxRedirects:5,
+const config:AppConfig={controlPlaneHost:'control.example.com', controlPlaneRegistrableDomain:'example.com', controlPlaneRegistrableDomain:'example.com',previewDomainSuffix:'preview.example.net',databaseUrl:'postgres://x',dataRoot:'/tmp/pwa-preview-auth-security',sessionSecret:'s'.repeat(32),githubClientId:'client',githubClientSecret:'secret',ttlMinMinutes:5,ttlDefaultMinutes:30,ttlMaxMinutes:1440,maxCompressedBytes:100000,maxExtractedBytes:500000,maxFileCount:100,maxPathLength:1024,urlFetchTimeoutMs:30000,maxRedirects:5,
   maxActivePreviewsPerUser:20, maxConcurrentImportsPerUser:2,
   maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,cleanupIntervalMs:60000,reconciliationIntervalMs:600000,staleOperationMinutes:30,staleStagingMinutes:60,migrateOnStart:false};
 const github={exchangeCode:async()=> 'token',fetchIdentity:async()=>({subject:'123',email:'blocked@example.com',emailVerified:true,displayName:'Blocked'})};
