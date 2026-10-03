@@ -2,7 +2,9 @@
 
 ## Compose model
 
-Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application and assumes PostgreSQL is provided separately through `DATABASE_URL`.
+Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application, pulls a pre-built image from GitHub Container Registry (GHCR), and assumes PostgreSQL is provided separately through `DATABASE_URL`.
+
+Coolify does not build the application image. Publishing a GitHub Release triggers `.github/workflows/release-image.yml`, which builds the Docker image on GitHub-hosted runners and pushes it to `ghcr.io/erland/pwa-preview`.
 
 The ordinary `compose.yaml` is intended for local development and includes its own PostgreSQL container.
 
@@ -92,6 +94,7 @@ Register the exact deployed callback URL in the GitHub OAuth application.
 At minimum configure these values in Coolify rather than committing them to the compose file:
 
 ```text
+PWA_PREVIEW_VERSION=1.0.0
 CONTROL_PLANE_HOST=...
 PREVIEW_DOMAIN_SUFFIX=...
 DATABASE_URL=postgres://pwa_preview:<password>@<shared-postgres-host>:5432/pwa_preview
@@ -99,6 +102,8 @@ SESSION_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 ```
+
+`PWA_PREVIEW_VERSION` selects the GHCR image tag. For deterministic deployments, use an immutable release version such as `1.0.0` rather than `latest`.
 
 Then deploy with `compose.coolify.yaml`. It intentionally has no published host port; Coolify/Traefik routes to the exposed internal port 3000.
 
@@ -153,3 +158,20 @@ After deploy, verify:
 The production image runs as the non-root `node` user. `/data` is created and owned by that user in the image and must remain writable when mounted persistently.
 
 Do not scale this v1 container to multiple active replicas while using local `/data`. Multi-instance deployment requires shared object storage and distributed coordination as described in the architecture document.
+
+
+## Release image publishing
+
+Publishing a GitHub Release builds and pushes a multi-architecture image for `linux/amd64` and `linux/arm64`.
+
+For a release tagged `v1.2.3`, GHCR receives version aliases including:
+
+```text
+ghcr.io/erland/pwa-preview:v1.2.3
+ghcr.io/erland/pwa-preview:1.2.3
+ghcr.io/erland/pwa-preview:1.2
+ghcr.io/erland/pwa-preview:1
+ghcr.io/erland/pwa-preview:latest
+```
+
+`latest` is only updated for non-prerelease releases. Coolify should normally pin `PWA_PREVIEW_VERSION` to the exact release version. After publishing a new release, change that variable (or otherwise trigger the desired Coolify redeploy) so Coolify pulls the already-built image.
