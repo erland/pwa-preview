@@ -28,6 +28,8 @@ describe('configuration', () => {
       maxRedirects: 5,
       maxActivePreviewsPerUser: 20,
       maxConcurrentImportsPerUser: 2,
+      maxStorageBytesPerUser: 2 * 1024 * 1024 * 1024,
+      maxStorageBytesTotal: 20 * 1024 * 1024 * 1024,
     });
   });
 
@@ -54,6 +56,10 @@ describe('configuration', () => {
       .toThrow('MAX_ACTIVE_PREVIEWS_PER_USER must be a positive integer');
     expect(() => loadConfig({ ...baseEnv, MAX_CONCURRENT_IMPORTS_PER_USER: '0' }))
       .toThrow('MAX_CONCURRENT_IMPORTS_PER_USER must be a positive integer');
+    expect(() => loadConfig({ ...baseEnv, MAX_STORAGE_BYTES_PER_USER: '0' }))
+      .toThrow('MAX_STORAGE_BYTES_PER_USER must be a positive integer');
+    expect(() => loadConfig({ ...baseEnv, MAX_STORAGE_BYTES_TOTAL: '0' }))
+      .toThrow('MAX_STORAGE_BYTES_TOTAL must be a positive integer');
   });
 
   it('does not expose secrets in the safe summary', () => {
