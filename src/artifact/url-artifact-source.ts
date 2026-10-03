@@ -1,17 +1,34 @@
 import https from 'node:https';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { AppConfig } from '../config.js';
 import { SsrfPolicy } from './ssrf-policy.js';
 
 export type DownloadHopResult =
   | { kind: 'redirect'; location: string }
-  | { kind: 'body'; body: Buffer };
+  | { kind: 'body'; bytes: number };
 
-export type DownloadHop = (url: URL, address: string, family: 4 | 6, timeoutMs: number, maxBytes: number) => Promise<DownloadHopResult>;
+export type DownloadHop = (
+  url: URL,
+  address: string,
+  family: 4 | 6,
+  timeoutMs: number,
+  maxBytes: number,
+  destinationPath: string,
+) => Promise<DownloadHopResult>;
 
-async function defaultDownloadHop(url: URL, address: string, family: 4 | 6, timeoutMs: number, maxBytes: number): Promise<DownloadHopResult> {
+async function defaultDownloadHop(
+  url: URL,
+  address: string,
+  family: 4 | 6,
+  timeoutMs: number,
+  maxBytes: number,
+  destinationPath: string,
+): Promise<DownloadHopResult> {
   return await new Promise((resolve, reject) => {
     const request = https.request(url, {
       method: 'GET',
@@ -36,18 +53,33 @@ async function defaultDownloadHop(url: URL, address: string, family: 4 | 6, time
         response.resume();
         return reject(new Error(`SOURCE_URL_HTTP_${status}`));
       }
-      const chunks: Buffer[] = [];
+
+      const contentLength = Number(response.headers['content-length']);
+      if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+        response.resume();
+        return reject(new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT'));
+      }
+
       let bytes = 0;
-      response.on('data', (chunk: Buffer) => {
-        bytes += chunk.length;
-        if (bytes > maxBytes) {
-          request.destroy(new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT'));
-          return;
-        }
-        chunks.push(Buffer.from(chunk));
+      const limiter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          bytes += chunk.length;
+          if (bytes > maxBytes) {
+            callback(new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT'));
+            return;
+          }
+          callback(null, chunk);
+        },
       });
-      response.on('end', () => resolve({ kind: 'body', body: Buffer.concat(chunks) }));
-      response.on('error', reject);
+
+      void pipeline(
+        response,
+        limiter,
+        createWriteStream(destinationPath, { flags: 'wx', mode: 0o600 }),
+      ).then(
+        () => resolve({ kind: 'body', bytes }),
+        (error) => reject(error),
+      );
     });
     request.on('timeout', () => request.destroy(new Error('SOURCE_URL_TIMEOUT')));
     request.on('error', reject);
@@ -69,10 +101,16 @@ export class UrlArtifactSource {
       let current = sourceUrl;
       for (let redirects = 0; ; redirects++) {
         const resolved = await this.policy.validateAndResolve(current);
-        const result = await this.downloadHop(resolved.url, resolved.address, resolved.family, this.config.urlFetchTimeoutMs, this.config.maxCompressedBytes);
+        const result = await this.downloadHop(
+          resolved.url,
+          resolved.address,
+          resolved.family,
+          this.config.urlFetchTimeoutMs,
+          this.config.maxCompressedBytes,
+          archivePath,
+        );
         if (result.kind === 'body') {
-          if (result.body.length > this.config.maxCompressedBytes) throw new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT');
-          await writeFile(archivePath, result.body);
+          if (result.bytes > this.config.maxCompressedBytes) throw new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT');
           return { archivePath, cleanup: async () => rm(dir, { recursive: true, force: true }) };
         }
         if (redirects >= this.config.maxRedirects) throw new Error('SOURCE_URL_TOO_MANY_REDIRECTS');
