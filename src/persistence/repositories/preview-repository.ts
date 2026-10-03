@@ -26,6 +26,14 @@ export class PreviewRepository {
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
   }
 
+  async countActiveOwned(ownerUserId: string): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM previews WHERE owner_user_id = $1 AND status IN ('CREATING','READY')",
+      [ownerUserId],
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
   async listOwned(ownerUserId: string): Promise<Preview[]> {
     const result = await this.pool.query(
       "SELECT * FROM previews WHERE owner_user_id = $1 AND status <> 'DELETED' ORDER BY created_at DESC",

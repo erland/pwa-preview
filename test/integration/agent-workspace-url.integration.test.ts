@@ -21,6 +21,7 @@ class MemoryPreviewRepository {
     this.rows.set(row.id,row); return row;
   }
   async findOwnedById(owner:string,id:string){ const r=this.rows.get(id); return r?.ownerUserId===owner?r:null; }
+  async countActiveOwned(owner:string){ return [...this.rows.values()].filter(r=>r.ownerUserId===owner && (r.status==='CREATING'||r.status==='READY')).length; }
   async listOwned(owner:string){ return [...this.rows.values()].filter(r=>r.ownerUserId===owner&&r.status!=='DELETED'); }
   async markReady(id:string,m:{compressedSizeBytes:number;extractedSizeBytes:number;fileCount:number;sourceSha256:string}){ const r=this.rows.get(id)!; const n={...r,status:'READY' as const,updatedAt:new Date(),...m,lastErrorCode:null}; this.rows.set(id,n); return n; }
   async markFailed(id:string,code:string){ const r=this.rows.get(id); if(r)this.rows.set(id,{...r,status:'FAILED',updatedAt:new Date(),lastErrorCode:code}); }
@@ -34,6 +35,8 @@ function config(dataRoot:string): AppConfig { return {
   controlPlaneHost:'control.example.com', previewDomainSuffix:'preview.example.com', databaseUrl:'postgres://unused', dataRoot,
   sessionSecret:'x'.repeat(32), githubClientId:'unused', githubClientSecret:'unused', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
   maxCompressedBytes:100*1024*1024, maxExtractedBytes:500*1024*1024, maxFileCount:20000, maxPathLength:1024, urlFetchTimeoutMs:30000, maxRedirects:5,
+      maxActivePreviewsPerUser: 20,
+      maxConcurrentImportsPerUser: 2,
   cleanupIntervalMs:60000, reconciliationIntervalMs:600000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:false,
 }; }
 

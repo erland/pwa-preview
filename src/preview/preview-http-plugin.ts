@@ -103,7 +103,8 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PREVIEW_UPDATE_FAILED';
       request.log.warn({ err: message }, 'preview update failed');
-      return reply.code(message.startsWith('SOURCE_URL_') ? 400 : 422).send({ error: message });
+      const status = message === 'IMPORT_CONCURRENCY_LIMIT' ? 429 : message.startsWith('SOURCE_URL_') ? 400 : 422;
+      return reply.code(status).send({ error: message });
     }
   });
 
@@ -143,7 +144,8 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
       } catch (error) {
         request.log.warn({ err: error instanceof Error ? error.message : 'url import failed' }, 'preview URL creation failed');
         const message = error instanceof Error ? error.message : 'PREVIEW_CREATE_FAILED';
-        return reply.code(message === 'INVALID_TTL' || message.startsWith('SOURCE_URL_') ? 400 : 422).send({ error: message });
+        const status = message === 'ACTIVE_PREVIEW_LIMIT' || message === 'IMPORT_CONCURRENCY_LIMIT' ? 429 : message === 'INVALID_TTL' || message.startsWith('SOURCE_URL_') ? 400 : 422;
+        return reply.code(status).send({ error: message });
       }
     }
     const part = await request.file();
@@ -172,7 +174,7 @@ export async function registerPreviewHttp(app: FastifyInstance, config: AppConfi
     } catch (error) {
       request.log.warn({ err: error }, 'preview creation failed');
       const message = error instanceof Error ? error.message : 'PREVIEW_CREATE_FAILED';
-      const status = message === 'INVALID_TTL' ? 400 : 422;
+      const status = message === 'ACTIVE_PREVIEW_LIMIT' || message === 'IMPORT_CONCURRENCY_LIMIT' ? 429 : message === 'INVALID_TTL' ? 400 : 422;
       return reply.code(status).send({ error: message });
     } finally {
       await rm(dir, { recursive: true, force: true });

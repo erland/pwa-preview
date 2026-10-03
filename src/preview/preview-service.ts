@@ -10,6 +10,37 @@ import { createPreviewId } from './preview-id.js';
 import { PreviewPublisher } from './preview-publisher.js';
 import { UrlArtifactSource } from '../artifact/url-artifact-source.js';
 
+const importCounts = new Map<string, number>();
+const createLocks = new Map<string, Promise<void>>();
+
+async function withImportPermit<T>(userId: string, limit: number, work: () => Promise<T>): Promise<T> {
+  const active = importCounts.get(userId) ?? 0;
+  if (active >= limit) throw new Error('IMPORT_CONCURRENCY_LIMIT');
+  importCounts.set(userId, active + 1);
+  try {
+    return await work();
+  } finally {
+    const next = (importCounts.get(userId) ?? 1) - 1;
+    if (next <= 0) importCounts.delete(userId);
+    else importCounts.set(userId, next);
+  }
+}
+
+async function withCreateLock<T>(userId: string, work: () => Promise<T>): Promise<T> {
+  const previous = createLocks.get(userId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const chain = previous.then(() => gate);
+  createLocks.set(userId, chain);
+  await previous;
+  try {
+    return await work();
+  } finally {
+    release();
+    if (createLocks.get(userId) === chain) createLocks.delete(userId);
+  }
+}
+
 async function sha256File(file: string): Promise<string> {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
@@ -39,22 +70,26 @@ export class PreviewService {
   }
 
   async createFromFile(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null }): Promise<Preview> {
-    return this.createFromArtifact({ ...input, sourceType: 'UPLOAD' });
+    return withImportPermit(input.ownerUserId, this.config.maxConcurrentImportsPerUser, () =>
+      this.createFromArtifact({ ...input, sourceType: 'UPLOAD' }));
   }
 
   async createFromUrl(input: { ownerUserId: string; sourceUrl: string; lifetimeMinutes?: number; displayName?: string | null }): Promise<Preview> {
-    const fetched = await this.urlSource.fetch(input.sourceUrl);
-    try {
-      return await this.createFromArtifact({
-        ownerUserId: input.ownerUserId,
-        archivePath: fetched.archivePath,
-        sourceType: 'URL',
-        ...(input.lifetimeMinutes !== undefined ? { lifetimeMinutes: input.lifetimeMinutes } : {}),
-        ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
-      });
-    } finally {
-      await fetched.cleanup().catch(() => undefined);
-    }
+    return withImportPermit(input.ownerUserId, this.config.maxConcurrentImportsPerUser, async () => {
+      await this.assertActivePreviewCapacity(input.ownerUserId);
+      const fetched = await this.urlSource.fetch(input.sourceUrl);
+      try {
+        return await this.createFromArtifact({
+          ownerUserId: input.ownerUserId,
+          archivePath: fetched.archivePath,
+          sourceType: 'URL',
+          ...(input.lifetimeMinutes !== undefined ? { lifetimeMinutes: input.lifetimeMinutes } : {}),
+          ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+        });
+      } finally {
+        await fetched.cleanup().catch(() => undefined);
+      }
+    });
   }
 
   private async createFromArtifact(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview> {
@@ -63,7 +98,10 @@ export class PreviewService {
     const id = createPreviewId();
     const hostname = `${id}.${this.config.previewDomainSuffix}`;
     const expiresAt = new Date(Date.now() + lifetime * 60_000);
-    await this.repository.create({ id, ownerUserId: input.ownerUserId, hostname, expiresAt, sourceType: input.sourceType, displayName: input.displayName ?? null });
+    await withCreateLock(input.ownerUserId, async () => {
+      await this.assertActivePreviewCapacity(input.ownerUserId);
+      await this.repository.create({ id, ownerUserId: input.ownerUserId, hostname, expiresAt, sourceType: input.sourceType, displayName: input.displayName ?? null });
+    });
     let stagingKey: Awaited<ReturnType<ArchiveImporter['importFromFile']>>['stagingKey'] | undefined;
     try {
       const imported = await this.importer.importFromFile(input.archivePath);
@@ -80,16 +118,19 @@ export class PreviewService {
   }
 
   async updateFromFile(input: { ownerUserId: string; previewId: string; archivePath: string }): Promise<Preview | null> {
-    return this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ...input, sourceType: 'UPLOAD' }));
+    return withImportPermit(input.ownerUserId, this.config.maxConcurrentImportsPerUser, () =>
+      this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ...input, sourceType: 'UPLOAD' })));
   }
 
   async updateFromUrl(input: { ownerUserId: string; previewId: string; sourceUrl: string }): Promise<Preview | null> {
-    const fetched = await this.urlSource.fetch(input.sourceUrl);
-    try {
-      return await this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ownerUserId: input.ownerUserId, previewId: input.previewId, archivePath: fetched.archivePath, sourceType: 'URL' }));
-    } finally {
-      await fetched.cleanup().catch(() => undefined);
-    }
+    return withImportPermit(input.ownerUserId, this.config.maxConcurrentImportsPerUser, async () => {
+      const fetched = await this.urlSource.fetch(input.sourceUrl);
+      try {
+        return await this.withUpdateLock(input.previewId, () => this.updateFromArtifact({ ownerUserId: input.ownerUserId, previewId: input.previewId, archivePath: fetched.archivePath, sourceType: 'URL' }));
+      } finally {
+        await fetched.cleanup().catch(() => undefined);
+      }
+    });
   }
 
   private async updateFromArtifact(input: { ownerUserId: string; previewId: string; archivePath: string; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview | null> {
@@ -137,6 +178,11 @@ export class PreviewService {
       release();
       if (this.updateLocks.get(previewId) === chain) this.updateLocks.delete(previewId);
     }
+  }
+
+  private async assertActivePreviewCapacity(ownerUserId: string): Promise<void> {
+    const count = await this.repository.countActiveOwned(ownerUserId);
+    if (count >= this.config.maxActivePreviewsPerUser) throw new Error('ACTIVE_PREVIEW_LIMIT');
   }
 
   async listOwned(ownerUserId: string): Promise<Preview[]> {

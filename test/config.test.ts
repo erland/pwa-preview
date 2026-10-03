@@ -26,6 +26,8 @@ describe('configuration', () => {
       maxPathLength: 1024,
       urlFetchTimeoutMs: 30_000,
       maxRedirects: 5,
+      maxActivePreviewsPerUser: 20,
+      maxConcurrentImportsPerUser: 2,
     });
   });
 
@@ -48,6 +50,10 @@ describe('configuration', () => {
   it('rejects invalid numeric limits', () => {
     expect(() => loadConfig({ ...baseEnv, MAX_FILE_COUNT: '0' }))
       .toThrow('MAX_FILE_COUNT must be a positive integer');
+    expect(() => loadConfig({ ...baseEnv, MAX_ACTIVE_PREVIEWS_PER_USER: '0' }))
+      .toThrow('MAX_ACTIVE_PREVIEWS_PER_USER must be a positive integer');
+    expect(() => loadConfig({ ...baseEnv, MAX_CONCURRENT_IMPORTS_PER_USER: '0' }))
+      .toThrow('MAX_CONCURRENT_IMPORTS_PER_USER must be a positive integer');
   });
 
   it('does not expose secrets in the safe summary', () => {

@@ -15,6 +15,8 @@ export type AppConfig = Readonly<{
   maxPathLength: number;
   urlFetchTimeoutMs: number;
   maxRedirects: number;
+  maxActivePreviewsPerUser: number;
+  maxConcurrentImportsPerUser: number;
   cleanupIntervalMs: number;
   reconciliationIntervalMs: number;
   staleOperationMinutes: number;
@@ -97,6 +99,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
     maxPathLength: positiveInt(env, 'MAX_PATH_LENGTH', 1024),
     urlFetchTimeoutMs: positiveInt(env, 'URL_FETCH_TIMEOUT_MS', 30_000),
     maxRedirects: positiveInt(env, 'MAX_REDIRECTS', 5),
+    maxActivePreviewsPerUser: positiveInt(env, 'MAX_ACTIVE_PREVIEWS_PER_USER', 20),
+    maxConcurrentImportsPerUser: positiveInt(env, 'MAX_CONCURRENT_IMPORTS_PER_USER', 2),
     cleanupIntervalMs: positiveInt(env, 'CLEANUP_INTERVAL_MS', 60_000),
     reconciliationIntervalMs: positiveInt(env, 'RECONCILIATION_INTERVAL_MS', 10 * 60_000),
     staleOperationMinutes: positiveInt(env, 'STALE_OPERATION_MINUTES', 30),
@@ -119,6 +123,8 @@ export function safeConfigSummary(config: AppConfig): Record<string, string | nu
     maxPathLength: config.maxPathLength,
     urlFetchTimeoutMs: config.urlFetchTimeoutMs,
     maxRedirects: config.maxRedirects,
+    maxActivePreviewsPerUser: config.maxActivePreviewsPerUser,
+    maxConcurrentImportsPerUser: config.maxConcurrentImportsPerUser,
     cleanupIntervalMs: config.cleanupIntervalMs,
     reconciliationIntervalMs: config.reconciliationIntervalMs,
     staleOperationMinutes: config.staleOperationMinutes,
