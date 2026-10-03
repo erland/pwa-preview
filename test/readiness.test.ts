@@ -13,6 +13,8 @@ function config(dataRoot:string): AppConfig {
     controlPlaneHost:'control.example.com', previewDomainSuffix:'preview.example.com', databaseUrl:'postgres://unused', dataRoot,
     sessionSecret:'x'.repeat(32), githubClientId:'id', githubClientSecret:'secret', ttlMinMinutes:5, ttlDefaultMinutes:30, ttlMaxMinutes:1440,
     maxCompressedBytes:1, maxExtractedBytes:1, maxFileCount:1, maxPathLength:1024, urlFetchTimeoutMs:1000, maxRedirects:1,
+      maxActivePreviewsPerUser: 20,
+      maxConcurrentImportsPerUser: 2,
     cleanupIntervalMs:1000, reconciliationIntervalMs:1000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
   };
 }
