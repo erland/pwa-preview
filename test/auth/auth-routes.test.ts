@@ -4,7 +4,7 @@ import type { AppConfig } from '../../src/config.js';
 import type { DatabasePool } from '../../src/persistence/db.js';
 
 const config: AppConfig = {
-  controlPlaneHost: 'pwa-preview.example.com', previewDomainSuffix: 'preview.example.com', databaseUrl: 'postgres://unused', dataRoot: '/data',
+  controlPlaneHost: 'pwa-preview.example.com', previewDomainSuffix: 'preview.example.com', databaseUrl: 'postgres://unused', dataRoot: '/tmp/pwa-preview-auth-test',
   sessionSecret: '0123456789012345678901234567890123456789', githubClientId: 'client', githubClientSecret: 'secret',
   ttlMinMinutes: 5, ttlDefaultMinutes: 30, ttlMaxMinutes: 1440, maxCompressedBytes: 1, maxExtractedBytes: 2,
   maxFileCount: 3, maxPathLength: 1024, urlFetchTimeoutMs: 30000, maxRedirects: 5,
