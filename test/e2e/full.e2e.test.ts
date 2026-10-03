@@ -96,7 +96,7 @@ e2e('full E2E', () => {
   let v2Path: string;
   let v1: Buffer;
   let v2: Buffer;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let fetchSpy: { mockRestore(): void } | undefined;
 
   const githubIdentity = { subject: 'e2e-github-1', email: 'e2e@example.test', emailVerified: true as const, displayName: 'E2E User' };
   const githubClient = {
@@ -287,7 +287,7 @@ e2e('full E2E', () => {
     expect(afterRestart.statusCode).toBe(200);
     expect(afterRestart.body).toContain('VERSION-1');
 
-    await pool.query('UPDATE previews SET expires_at = now() - interval \'1 second\' WHERE id = $1', [created.previewId]);
+    await pool.query("UPDATE previews SET created_at = now() - interval '10 minutes', expires_at = now() - interval '1 second' WHERE id = $1", [created.previewId]);
     const store = new LocalVolumeObjectStore(config().dataRoot);
     await store.initialize();
     expect(await new CleanupJob(new PreviewRepository(pool), store).runOnce()).toBe(1);
