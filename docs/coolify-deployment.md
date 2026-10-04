@@ -2,7 +2,7 @@
 
 ## Compose model
 
-Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application, pulls a pre-built image from GitHub Container Registry (GHCR), and assumes PostgreSQL is provided separately. The Coolify Compose profile builds `DATABASE_URL` from explicit `DB_HOST`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` variables.
+Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application, pulls a pre-built image from GitHub Container Registry (GHCR), and assumes PostgreSQL is provided separately. The application builds `DATABASE_URL` at runtime from `DB_HOST`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` when an explicit `DATABASE_URL` is not provided.
 
 Coolify does not build the application image. Publishing a GitHub Release triggers `.github/workflows/release-image.yml`, which builds the Docker image on GitHub-hosted runners and pushes it to `ghcr.io/erland/pwa-preview`.
 
@@ -88,7 +88,7 @@ Mount a persistent volume at:
 /data
 ```
 
-Use PostgreSQL 17 or later for metadata. The recommended Coolify setup reuses a shared PostgreSQL instance but gives pwa-preview its own database and user. Set the Coolify `DB_*` variables for that database; `compose.coolify.yaml` builds the application's `DATABASE_URL` and does not start PostgreSQL itself.
+Use PostgreSQL 17 or later for metadata. The recommended Coolify setup reuses a shared PostgreSQL instance but gives pwa-preview its own database and user. Set the Coolify `DB_*` variables for that database; pwa-preview reads them at runtime and constructs its own `DATABASE_URL`. `compose.coolify.yaml` does not interpolate database credentials and does not start PostgreSQL itself.
 
 This v1 architecture assumes one active pwa-preview application instance because `/data` is local persistent storage.
 
@@ -145,7 +145,7 @@ PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
 
 `PWA_PREVIEW_VERSION` selects the GHCR image tag. For deterministic deployments, use an immutable release version such as `1.0.0` rather than `latest`.
 
-Then deploy with `compose.coolify.yaml`. It intentionally has no published host port; Coolify/Traefik routes to the exposed internal port 3000.
+Then deploy with `compose.coolify.yaml`. Keep the database values as normal Production runtime variables in Coolify; they do not need to be marked as build variables. The Compose file intentionally has no published host port; Coolify/Traefik routes to the exposed internal port 3000.
 
 ## Database migrations
 
