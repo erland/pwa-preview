@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "pwa-preview": {
+      "type": "streamable-http",
+      "url": "__PWA_PREVIEW_MCP_URL__"
+    }
+  }
+}
