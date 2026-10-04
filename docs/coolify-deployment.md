@@ -118,7 +118,7 @@ GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
 ALLOW_SAME_SITE_PREVIEWS=false
-MIGRATE_ON_START=false
+MIGRATE_ON_START=true
 ```
 
 The GitHub OAuth callback is derived from the configured control host:
@@ -164,13 +164,9 @@ Then deploy with `compose.coolify.yaml`. Keep the database values as normal Prod
 
 ## Database migrations
 
-For production, use controlled pre-deploy migrations:
+For a simple single-instance Coolify deployment, keep `MIGRATE_ON_START=true`. The application then applies pending migrations before startup, so a fresh database gets the required tables before startup logic runs.
 
-```text
-npm run db:migrate
-```
-
-Set `MIGRATE_ON_START=false` for the application process. Local development may keep the default `true`.
+If migrations are instead run as a controlled pre-deploy step with `npm run db:migrate`, set `MIGRATE_ON_START=false` only after that pre-deploy step is configured and guaranteed to run before the application starts.
 
 Migrations are transactional and tracked in `schema_migrations`.
 
