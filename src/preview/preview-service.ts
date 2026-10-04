@@ -123,8 +123,20 @@ export class PreviewService {
       const digest = await sha256File(input.archivePath);
       return await withStorageQuotaLock(async () => {
         await this.assertStorageCapacity(input.ownerUserId, imported.artifact.extractedSizeBytes, 0);
-        await this.publisher.publish(id, stagingKey!);
-        return await this.repository.markReady(id, { compressedSizeBytes: imported.artifact.compressedSizeBytes, extractedSizeBytes: imported.artifact.extractedSizeBytes, fileCount: imported.artifact.fileCount, sourceSha256: digest });
+        const replacement = await this.publisher.prepareReplacement(id, stagingKey!);
+        try {
+          const ready = await this.repository.markReady(id, {
+            compressedSizeBytes: imported.artifact.compressedSizeBytes,
+            extractedSizeBytes: imported.artifact.extractedSizeBytes,
+            fileCount: imported.artifact.fileCount,
+            sourceSha256: digest,
+          });
+          await replacement.commit();
+          return ready;
+        } catch (error) {
+          await replacement.rollback().catch(() => undefined);
+          throw error;
+        }
       });
     } catch (error) {
       await this.repository.markFailed(id, error instanceof Error ? error.message.slice(0, 120) : 'IMPORT_FAILED').catch(() => undefined);
