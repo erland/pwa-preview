@@ -9,6 +9,9 @@ import { registerPreviewHttp } from './preview/preview-http-plugin.js';
 import { registerUi } from './ui/ui-plugin.js';
 import { registerMcp } from './mcp/server.js';
 import { classifyRequestPlane } from './http-host-policy.js';
+import { PreviewRepository } from './persistence/repositories/preview-repository.js';
+import { LocalVolumeObjectStore } from './storage/local-volume-object-store.js';
+import { PreviewService } from './preview/preview-service.js';
 
 export type BuildAppOptions = Readonly<{
   config?: AppConfig;
@@ -40,13 +43,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     });
 
     void app.register(async (scope) => {
+      const config = options.config!;
+      const pool = options.pool!;
+      const previewStore = new LocalVolumeObjectStore(config.dataRoot);
+      await previewStore.initialize();
+      const previewRepository = new PreviewRepository(pool);
+      const previewService = new PreviewService(config, previewRepository, previewStore);
+
       await registerAuth(scope, {
-        config: options.config!,
-        pool: options.pool!,
+        config,
+        pool,
         ...(options.githubClient ? { githubClient: options.githubClient } : {}),
       });
-      await registerPreviewHttp(scope, options.config!, options.pool!);
-      await registerMcp(scope, options.config!, options.pool!);
+      await registerPreviewHttp(scope, config, previewService, previewRepository, previewStore);
+      await registerMcp(scope, config, pool, previewService);
       await registerUi(scope);
     });
   }

@@ -21,7 +21,8 @@ describe('MCP endpoint auth', () => {
       maxCompressedBytes:1024, maxExtractedBytes:2048, maxFileCount:100, maxPathLength:1024,
       urlFetchTimeoutMs:1000, urlMaxRedirects:2,
     } as any;
-    await registerMcp(app, config, pool);
+    const service = {} as any;
+    await registerMcp(app, config, pool, service);
     const response = await app.inject({ method:'POST', url:'/mcp', headers:{ host:'control.test', 'content-type':'application/json' }, payload:{ jsonrpc:'2.0', id:1, method:'tools/list', params:{} } });
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({ error:'INVALID_MCP_TOKEN' });
