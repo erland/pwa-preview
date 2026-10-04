@@ -98,7 +98,10 @@ export async function registerMcp(app: FastifyInstance, config: AppConfig, pool:
     const host = (request.headers.host ?? '').split(':')[0]?.toLowerCase();
     if (host !== config.controlPlaneHost.toLowerCase()) return reply.code(404).send({ error: 'NOT_FOUND' });
     const userId = await tokens.authenticate(request.headers.authorization);
-    if (!userId) return reply.code(401).header('WWW-Authenticate', 'Bearer').send({ error: 'INVALID_MCP_TOKEN' });
+    if (!userId) {
+      const resourceMetadata = `https://${config.controlPlaneHost}/.well-known/oauth-protected-resource/mcp`;
+      return reply.code(401).header('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadata}"`).send({ error: 'INVALID_MCP_TOKEN' });
+    }
     const handler = createMcpHttpHandler(service, userId, config);
     const node = toNodeHandler(handler);
     return node(request.raw as any, reply.raw as any, request.body);
