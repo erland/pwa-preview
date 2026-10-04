@@ -9,14 +9,14 @@ export class ReconciliationJob {
     let completedDeleting = 0;
     for (const preview of await this.repository.listByStatus('DELETING', 100)) {
       await this.store.deletePreviewArea(previewStorageKeyFromId(preview.id));
-      await this.repository.markDeletedSystem(preview.id);
+      await this.repository.markDeletedSystemFromDeleting(preview.id);
       completedDeleting += 1;
     }
 
     let failedCreating = 0;
     for (const preview of await this.repository.listStaleCreating(options.staleCreatingBefore, 100)) {
       await this.store.deletePreviewArea(previewStorageKeyFromId(preview.id));
-      await this.repository.markFailed(preview.id, 'STALE_CREATING');
+      await this.repository.markFailedFromCreating(preview.id, 'STALE_CREATING');
       failedCreating += 1;
     }
 
