@@ -62,12 +62,14 @@ export class PreviewRepository {
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
   }
 
-  async markReady(id: string, metadata: { compressedSizeBytes:number; extractedSizeBytes:number; fileCount:number; sourceSha256:string }): Promise<Preview> {
+  async markReadyFromCreating(id: string, metadata: { compressedSizeBytes:number; extractedSizeBytes:number; fileCount:number; sourceSha256:string }): Promise<Preview | null> {
     const result = await this.pool.query(
-      `UPDATE previews SET status='READY', compressed_size_bytes=$2, extracted_size_bytes=$3, file_count=$4, source_sha256=$5, last_error_code=NULL, updated_at=now() WHERE id=$1 RETURNING *`,
+      `UPDATE previews SET status='READY', compressed_size_bytes=$2, extracted_size_bytes=$3, file_count=$4, source_sha256=$5, last_error_code=NULL, updated_at=now()
+       WHERE id=$1 AND status='CREATING'
+       RETURNING *`,
       [id, metadata.compressedSizeBytes, metadata.extractedSizeBytes, metadata.fileCount, metadata.sourceSha256],
     );
-    return mapPreview(result.rows[0]!);
+    return result.rows[0] ? mapPreview(result.rows[0]) : null;
   }
 
   async markUpdatedOwned(ownerUserId: string, id: string, metadata: { compressedSizeBytes:number; extractedSizeBytes:number; fileCount:number; sourceSha256:string; sourceType: PreviewSourceType }): Promise<Preview | null> {
@@ -80,26 +82,32 @@ export class PreviewRepository {
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
   }
 
-  async markFailed(id: string, code: string): Promise<void> {
-    await this.pool.query("UPDATE previews SET status='FAILED', last_error_code=$2, updated_at=now() WHERE id=$1", [id, code]);
+  async markFailedFromCreating(id: string, code: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "UPDATE previews SET status='FAILED', last_error_code=$2, updated_at=now() WHERE id=$1 AND status='CREATING' RETURNING id",
+      [id, code],
+    );
+    return (result.rowCount ?? result.rows.length) > 0;
   }
 
   async markDeletingOwned(ownerUserId: string, id: string): Promise<Preview | null> {
     const result = await this.pool.query(
       `UPDATE previews SET status='DELETING', updated_at=now()
-       WHERE id=$1 AND owner_user_id=$2 AND status <> 'DELETED'
+       WHERE id=$1 AND owner_user_id=$2 AND status IN ('CREATING','READY','FAILED','EXPIRED','DELETING')
        RETURNING *`,
       [id, ownerUserId],
     );
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
   }
 
-  async markDeletedOwned(ownerUserId: string, id: string): Promise<void> {
-    await this.pool.query(
+  async markDeletedOwnedFromDeleting(ownerUserId: string, id: string): Promise<boolean> {
+    const result = await this.pool.query(
       `UPDATE previews SET status='DELETED', updated_at=now()
-       WHERE id=$1 AND owner_user_id=$2`,
+       WHERE id=$1 AND owner_user_id=$2 AND status='DELETING'
+       RETURNING id`,
       [id, ownerUserId],
     );
+    return (result.rowCount ?? result.rows.length) > 0;
   }
 
   async claimExpired(limit: number): Promise<Preview[]> {
@@ -126,8 +134,20 @@ export class PreviewRepository {
     return result.rows.map((row) => String(row.id));
   }
 
-  async markDeletedSystem(id: string): Promise<void> {
-    await this.pool.query("UPDATE previews SET status='DELETED', updated_at=now() WHERE id=$1", [id]);
+  async markDeletedSystemFromDeleting(id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "UPDATE previews SET status='DELETED', updated_at=now() WHERE id=$1 AND status='DELETING' RETURNING id",
+      [id],
+    );
+    return (result.rowCount ?? result.rows.length) > 0;
+  }
+
+  async markDeletedSystemFromExpired(id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "UPDATE previews SET status='DELETED', updated_at=now() WHERE id=$1 AND status='EXPIRED' RETURNING id",
+      [id],
+    );
+    return (result.rowCount ?? result.rows.length) > 0;
   }
 
   async extendOwned(ownerUserId: string, id: string, expiresAt: Date): Promise<Preview | null> {
