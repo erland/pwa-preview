@@ -8,23 +8,8 @@ import type { PreviewService } from '../preview/preview-service.js';
 import { requireAuth } from '../auth/auth-plugin.js';
 import { McpTokenService } from './token-service.js';
 import { ApplicationError } from '../errors/application-error.js';
+import { toPreviewOutput } from '../preview/preview-output.js';
 
-function asOutput(preview: any) {
-  return {
-    previewId: preview.id,
-    url: `https://${preview.hostname}`,
-    name: preview.displayName,
-    status: preview.status,
-    createdAt: preview.createdAt.toISOString(),
-    updatedAt: preview.updatedAt.toISOString(),
-    expiresAt: preview.expiresAt.toISOString(),
-    compressedSizeBytes: preview.compressedSizeBytes,
-    extractedSizeBytes: preview.extractedSizeBytes,
-    fileCount: preview.fileCount,
-    sourceSha256: preview.sourceSha256,
-    sourceType: preview.sourceType,
-  };
-}
 
 function result(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
@@ -48,13 +33,13 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
         ...(lifetimeMinutes !== undefined ? { lifetimeMinutes } : {}),
         ...(name !== undefined ? { displayName: name } : {}),
       });
-      return result(asOutput(preview));
+      return result(toPreviewOutput(preview));
     });
 
     server.registerTool('preview_list', {
       description: 'List previews owned by the authenticated user.',
       inputSchema: z.object({}),
-    }, async () => result({ previews: (await service.listOwned(userId)).map(asOutput) }));
+    }, async () => result({ previews: (await service.listOwned(userId)).map(toPreviewOutput) }));
 
     server.registerTool('preview_get', {
       description: 'Get one preview owned by the authenticated user.',
@@ -62,7 +47,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
     }, async ({ previewId }) => {
       const preview = await service.getOwned(userId, previewId);
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
-      return result(asOutput(preview));
+      return result(toPreviewOutput(preview));
     });
 
     server.registerTool('preview_update', {
@@ -71,7 +56,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
     }, async ({ previewId, sourceUrl }) => {
       const preview = await service.updateFromUrl({ ownerUserId: userId, previewId, sourceUrl });
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
-      return result(asOutput(preview));
+      return result(toPreviewOutput(preview));
     });
 
     server.registerTool('preview_extend', {
@@ -80,7 +65,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
     }, async ({ previewId, lifetimeMinutes }) => {
       const preview = await service.extendOwned(userId, previewId, lifetimeMinutes);
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
-      return result(asOutput(preview));
+      return result(toPreviewOutput(preview));
     });
 
     server.registerTool('preview_delete', {
