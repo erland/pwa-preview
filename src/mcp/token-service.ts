@@ -15,8 +15,13 @@ export class McpTokenService {
 
   async issue(userId: string, days = DEFAULT_TOKEN_DAYS): Promise<IssuedMcpToken> {
     if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error('INVALID_TOKEN_LIFETIME');
+    return this.issueForSeconds(userId, days * 24 * 60 * 60);
+  }
+
+  async issueForSeconds(userId: string, seconds: number): Promise<IssuedMcpToken> {
+    if (!Number.isInteger(seconds) || seconds < 60 || seconds > 365 * 24 * 60 * 60) throw new Error('INVALID_TOKEN_LIFETIME');
     const token = `${TOKEN_PREFIX}${randomBytes(32).toString('base64url')}`;
-    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + seconds * 1000);
     await this.db.query(
       'INSERT INTO mcp_tokens(user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
       [userId, hashToken(token), expiresAt],
