@@ -19,8 +19,9 @@ describe('control-plane UI', () => {
   });
 
   it('serves the control-plane index from the root route', async () => {
-    await mkdir('dist/ui', { recursive: true });
+    await mkdir('dist/ui/assets', { recursive: true });
     await writeFile('dist/ui/index.html', '<!doctype html><title>PWA Preview</title>');
+    await writeFile('dist/ui/assets/app.js', 'window.__PWA_PREVIEW_TEST__ = true;');
 
     const app = Fastify();
     try {
@@ -29,6 +30,11 @@ describe('control-plane UI', () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-type']).toContain('text/html');
       expect(response.body).toContain('PWA Preview');
+
+      const assetResponse = await app.inject({ method: 'GET', url: '/assets/app.js' });
+      expect(assetResponse.statusCode).toBe(200);
+      expect(assetResponse.headers['content-type']).toContain('javascript');
+      expect(assetResponse.body).toContain('__PWA_PREVIEW_TEST__');
     } finally {
       await app.close();
       await rm('dist/ui', { recursive: true, force: true });
