@@ -10,7 +10,7 @@ export class CleanupJob {
     let cleaned = 0;
     for (const preview of expired) {
       await this.store.deletePreviewArea(previewStorageKeyFromId(preview.id));
-      await this.repository.markDeletedSystem(preview.id);
+      await this.repository.markDeletedSystemFromExpired(preview.id);
       cleaned += 1;
     }
     return cleaned;
