@@ -1,15 +1,15 @@
 import { cp, mkdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { ObjectStore } from '../storage/object-store.js';
+import type { LocalPreviewStorage } from '../storage/local-preview-storage.js';
 import { detectArchiveFormat } from './archive-format.js';
 import { safeExtractArchive } from './safe-extractor.js';
 import { detectSiteRoot } from './site-root-detector.js';
 import type { ArtifactLimits, ImportedArtifact } from './types.js';
 
 export class ArchiveImporter {
-  constructor(private readonly store: ObjectStore, private readonly limits: ArtifactLimits) {}
+  constructor(private readonly store: LocalPreviewStorage, private readonly limits: ArtifactLimits) {}
 
-  async importFromFile(archivePath: string): Promise<{ stagingKey: Awaited<ReturnType<ObjectStore['createStagingArea']>>; artifact: ImportedArtifact }> {
+  async importFromFile(archivePath: string): Promise<{ stagingKey: Awaited<ReturnType<LocalPreviewStorage['createStagingArea']>>; artifact: ImportedArtifact }> {
     const compressedSizeBytes = (await stat(archivePath)).size;
     if (compressedSizeBytes > this.limits.maxCompressedBytes) throw new Error('Compressed artifact size exceeds limit');
     const format = await detectArchiveFormat(archivePath);
