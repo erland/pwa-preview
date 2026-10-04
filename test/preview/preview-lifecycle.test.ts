@@ -33,10 +33,10 @@ class RepoStub {
   markDeletingOwned = async (owner:string,id:string) => {
     const found=await this.findOwnedById(owner,id); if(!found || found.status==='DELETED') return null; this.value={...found,status:'DELETING'}; return this.value;
   };
-  markDeletedOwned = async (owner:string,id:string) => { const found=await this.findOwnedById(owner,id); if(found) this.value={...found,status:'DELETED'}; };
+  markDeletedOwnedFromDeleting = async (owner:string,id:string) => { const found=await this.findOwnedById(owner,id); if(!found || found.status!=='DELETING') return false; this.value={...found,status:'DELETED'}; return true; };
   create = async () => { throw new Error('unused'); };
-  markReady = async () => { throw new Error('unused'); };
-  markFailed = async () => undefined;
+  markReadyFromCreating = async () => { throw new Error('unused'); };
+  markFailedFromCreating = async () => false;
 }
 
 describe('PreviewService lifecycle', () => {

@@ -62,4 +62,43 @@ integration('PostgreSQL persistence', () => {
     expect((await previews.findOwnedById(owner.id,id))?.expiresAt.getTime()).toBe(created.expiresAt.getTime());
   });
 
+  test('preview lifecycle transitions require the expected source state', async () => {
+    const users = new UserRepository(pool);
+    const previews = new PreviewRepository(pool);
+    const owner = await users.create();
+
+    const creatingId='p-statecreating1234567890';
+    await previews.create({
+      id:creatingId,
+      ownerUserId:owner.id,
+      hostname:`${creatingId}.preview.example`,
+      expiresAt:new Date(Date.now()+600_000),
+      sourceType:'UPLOAD',
+    });
+
+    expect((await previews.markDeletingOwned(owner.id, creatingId))?.status).toBe('DELETING');
+    expect(await previews.markReadyFromCreating(creatingId, {
+      compressedSizeBytes:1,
+      extractedSizeBytes:1,
+      fileCount:1,
+      sourceSha256:'b'.repeat(64),
+    })).toBeNull();
+    expect(await previews.markFailedFromCreating(creatingId, 'LATE_FAILURE')).toBe(false);
+    expect((await previews.findOwnedById(owner.id, creatingId))?.status).toBe('DELETING');
+    expect(await previews.markDeletedOwnedFromDeleting(owner.id, creatingId)).toBe(true);
+    expect((await previews.findOwnedById(owner.id, creatingId))?.status).toBe('DELETED');
+
+    const readyId='p-stateready1234567890abc';
+    await previews.create({
+      id:readyId,
+      ownerUserId:owner.id,
+      hostname:`${readyId}.preview.example`,
+      expiresAt:new Date(Date.now()+600_000),
+      sourceType:'UPLOAD',
+      status:'READY',
+    });
+    expect(await previews.markFailedFromCreating(readyId, 'LATE_FAILURE')).toBe(false);
+    expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
+  });
+
 });

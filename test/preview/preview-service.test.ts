@@ -32,12 +32,17 @@ class FakeRepo {
   async sumReadyExtractedBytesOwned() { return this.item?.status === 'READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
   async sumReadyExtractedBytesTotal() { return this.item?.status === 'READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
   async create(input:any) { const now=new Date(); this.item={...input, displayName:input.displayName??null,status:'CREATING',createdAt:now,updatedAt:now,compressedSizeBytes:null,extractedSizeBytes:null,fileCount:null,sourceSha256:null,lastErrorCode:null}; this.activeCount += 1; return this.item; }
-  async markReady(id:string, m:any) {
+  async markReadyFromCreating(id:string, m:any) {
     if (this.failMarkReady) throw new Error('DATABASE_WRITE_FAILED');
+    if (this.item.status !== 'CREATING') return null;
     this.item={...this.item,status:'READY',...m,updatedAt:new Date()};
     return this.item;
   }
-  async markFailed(_id:string, code:string) { this.item={...this.item,status:'FAILED',lastErrorCode:code}; }
+  async markFailedFromCreating(_id:string, code:string) {
+    if (this.item.status !== 'CREATING') return false;
+    this.item={...this.item,status:'FAILED',lastErrorCode:code};
+    return true;
+  }
 }
 
 describe('PreviewService', () => {
