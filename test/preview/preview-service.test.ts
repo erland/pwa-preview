@@ -9,6 +9,7 @@ import { PreviewService } from '../../src/preview/preview-service.js';
 import type { Preview } from '../../src/domain/models.js';
 import type { PreviewRepository } from '../../src/persistence/repositories/preview-repository.js';
 import type { AppConfig } from '../../src/config.js';
+import { ApplicationError } from '../../src/errors/application-error.js';
 
 async function zip(file:string) {
   const z=new yazl.ZipFile(); z.addBuffer(Buffer.from('<h1>Hello</h1>'),'index.html'); z.addBuffer(Buffer.from('body{}'),'assets/app.css'); z.end();
@@ -73,7 +74,9 @@ describe('PreviewService', () => {
   it('rejects TTL outside configured bounds before creating metadata', async () => {
     const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-service-')); const store=new LocalVolumeObjectStore(path.join(root,'data')); await store.initialize(); const repo=new FakeRepo();
     const service=new PreviewService(config(path.join(root,'data')), repo as unknown as PreviewRepository, store);
-    await expect(service.createFromFile({ownerUserId:'u',archivePath:'/missing',lifetimeMinutes:1})).rejects.toThrow('INVALID_TTL');
+    const error = await service.createFromFile({ownerUserId:'u',archivePath:'/missing',lifetimeMinutes:1}).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ApplicationError);
+    expect(error).toMatchObject({ code: 'INVALID_TTL', message: 'INVALID_TTL' });
     expect(repo.item).toBeUndefined(); await rm(root,{recursive:true,force:true});
   });
 
@@ -83,7 +86,9 @@ describe('PreviewService', () => {
     const repo=new FakeRepo(); repo.activeCount=1;
     const limited={...config(path.join(root,'data')),maxActivePreviewsPerUser:1};
     const service=new PreviewService(limited, repo as unknown as PreviewRepository, store);
-    await expect(service.createFromFile({ownerUserId:'owner-a',archivePath:'/missing'})).rejects.toThrow('ACTIVE_PREVIEW_LIMIT');
+    const error = await service.createFromFile({ownerUserId:'owner-a',archivePath:'/missing'}).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ApplicationError);
+    expect(error).toMatchObject({ code: 'ACTIVE_PREVIEW_LIMIT' });
     await rm(root,{recursive:true,force:true});
   });
 
