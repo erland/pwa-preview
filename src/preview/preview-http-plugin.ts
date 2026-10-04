@@ -6,11 +6,10 @@ import { pipeline } from 'node:stream/promises';
 import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
-import type { DatabasePool } from '../persistence/db.js';
-import { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import { LocalVolumeObjectStore } from '../storage/local-volume-object-store.js';
+import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
+import type { ObjectStore } from '../storage/object-store.js';
 import { requireAuth } from '../auth/auth-plugin.js';
-import { PreviewService } from './preview-service.js';
+import type { PreviewService } from './preview-service.js';
 import { resolvePreviewIdFromHost } from './preview-host-resolver.js';
 import { classifyRequestPlane } from '../http-host-policy.js';
 import { servePreview } from './static-site-handler.js';
@@ -39,12 +38,14 @@ function previewResponse(preview: { id:string; hostname:string; displayName:stri
   };
 }
 
-export async function registerPreviewHttp(app: FastifyInstance, config: AppConfig, pool: DatabasePool): Promise<void> {
+export async function registerPreviewHttp(
+  app: FastifyInstance,
+  config: AppConfig,
+  service: PreviewService,
+  repository: PreviewRepository,
+  store: ObjectStore,
+): Promise<void> {
   await app.register(multipart, { limits: { fileSize: config.maxCompressedBytes, files: 1, fields: 4 } });
-  const store = new LocalVolumeObjectStore(config.dataRoot);
-  await store.initialize();
-  const repository = new PreviewRepository(pool);
-  const service = new PreviewService(config, repository, store);
 
   app.addHook('onRequest', async (request, reply) => {
     const plane = classifyRequestPlane(request.headers.host, config.controlPlaneHost, config.previewDomainSuffix);
