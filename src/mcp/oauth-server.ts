@@ -41,6 +41,10 @@ function requestPath(request: FastifyRequest): string {
 }
 
 export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, pool: DatabasePool): Promise<void> {
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
+    try { done(null, Object.fromEntries(new URLSearchParams(body))); }
+    catch (error) { done(error as Error, undefined); }
+  });
   const issuer = `https://${config.controlPlaneHost}`;
   const mcpUrl = `${issuer}/mcp`;
   const metadataUrl = `${issuer}/.well-known/oauth-protected-resource/mcp`;
@@ -174,7 +178,6 @@ export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, 
     return oauthError(reply, 'unsupported_grant_type', 'Unsupported grant_type');
   });
 
-  app.decorate('mcpOAuthResourceMetadataUrl', metadataUrl);
 }
 
 async function issueOAuthTokens(
