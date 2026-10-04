@@ -64,8 +64,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
 
   app.get('/auth/login/github', async (request, reply) => {
     const query = request.query as { returnTo?: string };
-    if (query.returnTo?.startsWith('/authorize?')) request.session.set('oauthReturnTo', query.returnTo);
-    else request.session.set('oauthReturnTo', undefined);
+    request.session.set('oauthReturnTo', query.returnTo?.startsWith('/authorize?') ? query.returnTo : '');
     const state = randomBytes(24).toString('base64url');
     request.session.set('oauthStateHash', stateHash(state));
     const callback = `https://${options.config.controlPlaneHost}/auth/callback/github`;
@@ -91,7 +90,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
       const { userId } = await users.loginWithGithub(identity);
       request.session.set('userId', userId);
       const returnTo = request.session.get('oauthReturnTo');
-      request.session.set('oauthReturnTo', undefined);
+      request.session.set('oauthReturnTo', '');
       return reply.redirect(typeof returnTo === 'string' && returnTo.startsWith('/authorize?') ? returnTo : '/');
     } catch (error) {
       if (error instanceof AccessDeniedError) return reply.code(403).send({ error: error.message });
