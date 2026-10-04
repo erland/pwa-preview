@@ -119,7 +119,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     sessionSecret,
     githubClientId: required(env, 'GITHUB_CLIENT_ID'),
     githubClientSecret: required(env, 'GITHUB_CLIENT_SECRET'),
-    githubAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS'),
+    ...(optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS') ? { githubAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS')! } : {}),
     ttlMinMinutes,
     ttlDefaultMinutes,
     ttlMaxMinutes,
