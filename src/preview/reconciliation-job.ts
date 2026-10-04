@@ -14,19 +14,18 @@ export class ReconciliationJob {
     }
 
     let failedCreating = 0;
-    for (const preview of await this.repository.listStaleCreating(options.staleCreatingBefore, 100)) {
+    for (const preview of await this.repository.claimStaleCreating(options.staleCreatingBefore, 100)) {
       await this.store.deletePreviewArea(previewStorageKeyFromId(preview.id));
-      await this.repository.markFailedFromCreating(preview.id, 'STALE_CREATING');
       failedCreating += 1;
     }
 
     const activeIds = new Set(await this.repository.listActiveIds());
     let deletedOrphanPreviews = 0;
     for (const id of await this.store.listPreviewKeys()) {
-      if (!activeIds.has(id)) {
-        await this.store.deletePreviewArea(previewStorageKeyFromId(id));
-        deletedOrphanPreviews += 1;
-      }
+      if (activeIds.has(id)) continue;
+      if (await this.repository.isActiveId(id)) continue;
+      await this.store.deletePreviewArea(previewStorageKeyFromId(id));
+      deletedOrphanPreviews += 1;
     }
 
     const deletedStaging = await this.store.deleteStagingOlderThan(options.staleStagingBefore);

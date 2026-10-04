@@ -124,14 +124,33 @@ export class PreviewRepository {
     return result.rows.map(mapPreview);
   }
 
-  async listStaleCreating(before: Date, limit: number): Promise<Preview[]> {
-    const result = await this.pool.query("SELECT * FROM previews WHERE status='CREATING' AND updated_at < $1 ORDER BY updated_at LIMIT $2", [before, limit]);
+  async claimStaleCreating(before: Date, limit: number): Promise<Preview[]> {
+    const result = await this.pool.query(
+      `UPDATE previews SET status='FAILED', last_error_code='STALE_CREATING', updated_at=now()
+       WHERE id IN (
+         SELECT id FROM previews
+         WHERE status='CREATING' AND updated_at < $1
+         ORDER BY updated_at
+         LIMIT $2
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING *`,
+      [before, limit],
+    );
     return result.rows.map(mapPreview);
   }
 
   async listActiveIds(): Promise<string[]> {
     const result = await this.pool.query("SELECT id FROM previews WHERE status NOT IN ('DELETED')");
     return result.rows.map((row) => String(row.id));
+  }
+
+  async isActiveId(id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "SELECT 1 FROM previews WHERE id=$1 AND status NOT IN ('DELETED') LIMIT 1",
+      [id],
+    );
+    return result.rows.length > 0;
   }
 
   async markDeletedSystemFromDeleting(id: string): Promise<boolean> {
