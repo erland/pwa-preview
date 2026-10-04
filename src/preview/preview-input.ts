@@ -6,7 +6,9 @@ export const previewIdSchema = z.string().refine(isPreviewId, { message: 'INVALI
 
 export const previewNameSchema = z.string().trim().min(1, 'INVALID_PREVIEW_NAME').max(200, 'INVALID_PREVIEW_NAME');
 
-export const sourceUrlSchema = z.string().trim().url('INVALID_SOURCE_URL').refine((value) => {
+export const sourceUrlSchema = z.string().trim().refine((value) => {
+  try { new URL(value); return true; } catch { return false; }
+}, { message: 'INVALID_SOURCE_URL' }).refine((value) => {
   try { return new URL(value).protocol === 'https:'; } catch { return false; }
 }, { message: 'SOURCE_URL_HTTPS_REQUIRED' });
 
