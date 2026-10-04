@@ -140,6 +140,14 @@ The remote MCP endpoint is `POST /mcp` (Streamable HTTP). Interactive MCP client
 Tools: `preview_create`, `preview_list`, `preview_get`, `preview_update`, `preview_extend`, `preview_delete`. MCP create/update use HTTPS `sourceUrl`; tools never accept `ownerUserId`.
 
 
+### OpenAI plugin package
+
+GitHub Releases also publish a portable OpenAI/Agent Plugins package named `pwa-preview-plugin-<version>.zip`. It declares the production Streamable HTTP MCP endpoint and includes workflow guidance for using PWA Preview directly from ChatGPT/Codex, including the Agent Workspace artifact handoff and stable-URL update flow.
+
+The package is generated from templates in `plugin/`. The public MCP URL is configurable with the GitHub Actions variable `PWA_PREVIEW_MCP_URL` and defaults to `https://pwa-preview.apphome.one/mcp`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package format, build command, release behavior, and configuration.
+
+
+
 ## Production deployment
 
 Production deployment is designed for Coolify/Traefik. Use `compose.coolify.yaml` for production; it pulls `ghcr.io/erland/pwa-preview:<version>`, starts only pwa-preview, keeps `/data` persistent, and expects an external/shared PostgreSQL database through `DATABASE_URL`. The ordinary `compose.yaml` remains the self-contained local-development stack with PostgreSQL included.
@@ -177,3 +185,4 @@ The Agent Workspace handoff has been exercised with real build artifacts and sig
 - [`docs/e2e-verification.md`](docs/e2e-verification.md) — release-blocking E2E coverage
 - [`docs/agent-workspace-integration.md`](docs/agent-workspace-integration.md) — Agent Workspace handoff
 - [`docs/release-checklist.md`](docs/release-checklist.md) — final release gates
+- [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) — portable ChatGPT/Codex plugin package and release build
