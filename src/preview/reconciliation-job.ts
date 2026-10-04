@@ -1,9 +1,9 @@
 import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import type { ObjectStore } from '../storage/object-store.js';
+import type { LocalPreviewStorage } from '../storage/local-preview-storage.js';
 import { previewStorageKeyFromId } from '../storage/storage-key.js';
 
 export class ReconciliationJob {
-  constructor(private readonly repository: PreviewRepository, private readonly store: ObjectStore) {}
+  constructor(private readonly repository: PreviewRepository, private readonly store: LocalPreviewStorage) {}
 
   async runOnce(options: { staleCreatingBefore: Date; staleStagingBefore: Date }): Promise<{completedDeleting:number; failedCreating:number; deletedOrphanPreviews:number; deletedStaging:number}> {
     let completedDeleting = 0;
