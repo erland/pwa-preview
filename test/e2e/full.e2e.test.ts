@@ -271,6 +271,84 @@ e2e('full E2E', () => {
     await app.close();
   });
 
+  test('serializes concurrent REST and MCP updates for the same preview', async () => {
+    const app = buildApp({ config: config(), pool, githubClient });
+    const address = await app.listen({ host: '127.0.0.1', port: 0 });
+    const cookie = await authenticatedCookie(app);
+
+    const me = await app.inject({ method: 'GET', url: '/api/me', headers: { host: 'control.example.test', cookie } });
+    const { userId } = me.json() as { userId: string };
+    const issued = await new McpTokenService(pool).issue(userId, 1);
+
+    const createBoundary = '----pwa-preview-e2e-concurrency-create';
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/previews',
+      headers: { host: 'control.example.test', cookie, 'content-type': `multipart/form-data; boundary=${createBoundary}` },
+      payload: multipart(createBoundary, v1, { lifetimeMinutes: '5', name: 'Concurrency E2E' }),
+    });
+    expect(create.statusCode).toBe(201);
+    const created = create.json() as { previewId: string; url: string };
+
+    const originalReplacePreviewSite = LocalVolumeObjectStore.prototype.replacePreviewSite;
+    let replaceCalls = 0;
+    let releaseFirst!: () => void;
+    let firstReplaceStarted!: () => void;
+    const firstReplaceGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const firstReplaceStartedPromise = new Promise<void>((resolve) => { firstReplaceStarted = resolve; });
+    const replaceSpy = vi.spyOn(LocalVolumeObjectStore.prototype, 'replacePreviewSite').mockImplementation(
+      async function(this: LocalVolumeObjectStore, key, sourceDir) {
+        replaceCalls += 1;
+        if (replaceCalls === 1) {
+          firstReplaceStarted();
+          await firstReplaceGate;
+        }
+        return originalReplacePreviewSite.call(this, key, sourceDir);
+      },
+    );
+
+    try {
+      const updateBoundary = '----pwa-preview-e2e-concurrency-rest';
+      const restUpdate = app.inject({
+        method: 'PUT',
+        url: `/api/previews/${created.previewId}/content`,
+        headers: { host: 'control.example.test', cookie, 'content-type': `multipart/form-data; boundary=${updateBoundary}` },
+        payload: multipart(updateBoundary, v2),
+      });
+
+      await firstReplaceStartedPromise;
+
+      const mcpUpdate = postRpc(address, issued.token, {
+        jsonrpc: '2.0',
+        id: 42,
+        method: 'tools/call',
+        params: {
+          name: 'preview_update',
+          arguments: { previewId: created.previewId, sourceUrl: 'https://artifacts.example.test/v1.zip' },
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(replaceCalls).toBe(1);
+
+      releaseFirst();
+
+      const [restResponse, mcpEnvelope] = await Promise.all([restUpdate, mcpUpdate]);
+      expect(restResponse.statusCode).toBe(200);
+      expect((toolOutput(mcpEnvelope) as { previewId: string }).previewId).toBe(created.previewId);
+      expect(replaceCalls).toBe(2);
+
+      const previewHost = new URL(created.url).hostname;
+      const finalPreview = await app.inject({ method: 'GET', url: '/', headers: { host: previewHost } });
+      expect(finalPreview.statusCode).toBe(200);
+      expect(finalPreview.body).toContain('VERSION-1');
+    } finally {
+      releaseFirst?.();
+      replaceSpy.mockRestore();
+      await app.close();
+    }
+  });
+
   test('restart: published preview survives restart, then expiry cleanup removes it', async () => {
     const app1 = buildApp({ config: config(), pool, githubClient });
     const cookie = await authenticatedCookie(app1);
