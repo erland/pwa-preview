@@ -4,9 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import * as z from 'zod/v4';
 import type { AppConfig } from '../config.js';
 import type { DatabasePool } from '../persistence/db.js';
-import { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import { LocalVolumeObjectStore } from '../storage/local-volume-object-store.js';
-import { PreviewService } from '../preview/preview-service.js';
+import type { PreviewService } from '../preview/preview-service.js';
 import { requireAuth } from '../auth/auth-plugin.js';
 import { McpTokenService } from './token-service.js';
 
@@ -97,10 +95,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
   });
 }
 
-export async function registerMcp(app: FastifyInstance, config: AppConfig, pool: DatabasePool): Promise<void> {
-  const store = new LocalVolumeObjectStore(config.dataRoot);
-  await store.initialize();
-  const service = new PreviewService(config, new PreviewRepository(pool), store);
+export async function registerMcp(app: FastifyInstance, config: AppConfig, pool: DatabasePool, service: PreviewService): Promise<void> {
   const tokens = new McpTokenService(pool);
 
   app.post('/api/mcp-tokens', { preHandler: requireAuth }, async (request, reply) => {
