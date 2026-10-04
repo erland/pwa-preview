@@ -35,12 +35,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=coolify"
-      - "traefik.http.routers.pwa-preview-wildcard.rule=HostRegexp(`[a-z0-9-]+\\.${PREVIEW_DOMAIN_SUFFIX}`)"
+      - "traefik.http.routers.pwa-preview-wildcard.rule=HostRegexp(`[a-z0-9-]+\\.preview\\.apphome\\.one`)"
       - "traefik.http.routers.pwa-preview-wildcard.entrypoints=https"
       - "traefik.http.routers.pwa-preview-wildcard.tls=true"
       - "traefik.http.routers.pwa-preview-wildcard.tls.certresolver=desec"
-      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].main=${PREVIEW_DOMAIN_SUFFIX}"
-      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].sans=*.${PREVIEW_DOMAIN_SUFFIX}"
+      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].main=preview.apphome.one"
+      - "traefik.http.routers.pwa-preview-wildcard.tls.domains[0].sans=*.preview.apphome.one"
       - "traefik.http.routers.pwa-preview-wildcard.service=pwa-preview-wildcard"
       - "traefik.http.services.pwa-preview-wildcard.loadbalancer.server.port=3000"
     expose:
