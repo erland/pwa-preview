@@ -76,3 +76,24 @@ jobs:
         run: |
           docker inspect pwa-preview:ci --format '{{json .Config.Healthcheck.Test}}' | grep -q '"node"'
           ! docker inspect pwa-preview:ci --format '{{json .Config.Healthcheck.Test}}' | grep -q '"wget"'
+
+
+  plugin-package:
+    runs-on: ubuntu-24.04
+    env:
+      PWA_PREVIEW_MCP_URL: https://pwa-preview.example.test/mcp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build portable OpenAI plugin
+        run: npm run plugin:build -- --version 0.0.0-ci
+      - name: Validate generated package
+        run: |
+          test -f build/plugin/pwa-preview/plugin.json
+          test -f build/plugin/pwa-preview/mcp.json
+          test -f build/plugin/pwa-preview/skills/pwa-preview/SKILL.md
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin/pwa-preview/plugin.json')); if(p.name!=='pwa-preview'||p.version!=='0.0.0-ci') process.exit(1)"
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('build/plugin/pwa-preview/mcp.json')); if(m.mcpServers['pwa-preview'].url!=='https://pwa-preview.example.test/mcp') process.exit(1)"

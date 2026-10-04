@@ -1,4 +1,4 @@
-name: Release Docker image
+name: Release Docker image and plugin
 
 on:
   release:
@@ -49,3 +49,36 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  publish-plugin:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      PWA_PREVIEW_MCP_URL: ${{ vars.PWA_PREVIEW_MCP_URL || 'https://pwa-preview.apphome.one/mcp' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build portable OpenAI plugin
+        id: plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm run plugin:build -- --version "$VERSION"
+          cd build/plugin
+          zip -qr "../pwa-preview-plugin-${VERSION}.zip" pwa-preview
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "archive=build/pwa-preview-plugin-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+      - name: Inspect plugin archive
+        run: |
+          unzip -l "${{ steps.plugin.outputs.archive }}"
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+      - name: Attach plugin ZIP to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" --clobber

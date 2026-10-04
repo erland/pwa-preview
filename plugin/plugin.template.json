@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pwa-preview",
+  "version": "__PLUGIN_VERSION__",
+  "description": "Deploy and manage temporary HTTPS previews of pre-built static web applications and PWAs.",
+  "author": {
+    "name": "Erland Lindmark"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "PWA Preview",
+        "shortDescription": "Temporary PWA previews",
+        "longDescription": "Publish already-built static web applications and PWAs to temporary HTTPS preview URLs. Create, inspect, update, extend, and delete previews without executing application build code.",
+        "developerName": "Erland Lindmark",
+        "category": "Developer Tools",
+        "defaultPrompt": [
+          "Publish this built static web app as a temporary preview.",
+          "Update my existing preview with the latest build.",
+          "Show me my active PWA previews."
+        ]
+      }
+    }
+  }
+}
