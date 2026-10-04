@@ -7,6 +7,7 @@ export type AppConfig = Readonly<{
   sessionSecret: string;
   githubClientId: string;
   githubClientSecret: string;
+  githubAllowlistEmails?: readonly string[];
   ttlMinMinutes: number;
   ttlDefaultMinutes: number;
   ttlMaxMinutes: number;
@@ -53,6 +54,19 @@ function booleanValue(env: Env, key: string, fallback: boolean): boolean {
   if (raw === 'true' || raw === '1' || raw === 'yes') return true;
   if (raw === 'false' || raw === '0' || raw === 'no') return false;
   throw new Error(`Invalid configuration: ${key} must be true or false`);
+}
+
+function optionalEmailList(env: Env, key: string): readonly string[] | undefined {
+  const raw = env[key]?.trim();
+  if (!raw) return undefined;
+  const emails = [...new Set(raw.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))];
+  if (emails.length === 0) return undefined;
+  for (const email of emails) {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      throw new Error(`Invalid configuration: ${key} must contain comma-separated email addresses`);
+    }
+  }
+  return Object.freeze(emails);
 }
 
 function host(value: string, key: string): string {
@@ -105,6 +119,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     sessionSecret,
     githubClientId: required(env, 'GITHUB_CLIENT_ID'),
     githubClientSecret: required(env, 'GITHUB_CLIENT_SECRET'),
+    githubAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS'),
     ttlMinMinutes,
     ttlDefaultMinutes,
     ttlMaxMinutes,
