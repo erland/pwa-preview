@@ -9,23 +9,20 @@ import { requireAuth } from '../auth/auth-plugin.js';
 import { McpTokenService } from './token-service.js';
 import { ApplicationError } from '../errors/application-error.js';
 import { toPreviewOutput } from '../preview/preview-output.js';
+import { createUrlInputSchema, extendInputSchema, previewIdSchema, updateUrlInputSchema } from '../preview/preview-input.js';
 
 
 function result(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 
-export function createMcpHttpHandler(service: PreviewService, userId: string) {
+export function createMcpHttpHandler(service: PreviewService, userId: string, config: AppConfig) {
   return createMcpHandler(() => {
     const server = new McpServer({ name: 'pwa-preview', version: '0.1.0' });
 
     server.registerTool('preview_create', {
       description: 'Create a temporary preview from an HTTPS URL pointing to a ZIP or tar.gz static artifact.',
-      inputSchema: z.object({
-        sourceUrl: z.string().url(),
-        lifetimeMinutes: z.number().int().optional(),
-        name: z.string().trim().min(1).max(200).optional(),
-      }),
+      inputSchema: createUrlInputSchema(config),
     }, async ({ sourceUrl, lifetimeMinutes, name }) => {
       const preview = await service.createFromUrl({
         ownerUserId: userId,
@@ -43,7 +40,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
 
     server.registerTool('preview_get', {
       description: 'Get one preview owned by the authenticated user.',
-      inputSchema: z.object({ previewId: z.string().min(1) }),
+      inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {
       const preview = await service.getOwned(userId, previewId);
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
@@ -52,7 +49,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
 
     server.registerTool('preview_update', {
       description: 'Replace the content of an owned preview from an HTTPS artifact URL while keeping the same preview URL.',
-      inputSchema: z.object({ previewId: z.string().min(1), sourceUrl: z.string().url() }),
+      inputSchema: updateUrlInputSchema(),
     }, async ({ previewId, sourceUrl }) => {
       const preview = await service.updateFromUrl({ ownerUserId: userId, previewId, sourceUrl });
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
@@ -61,7 +58,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
 
     server.registerTool('preview_extend', {
       description: 'Extend the lifetime of an owned preview.',
-      inputSchema: z.object({ previewId: z.string().min(1), lifetimeMinutes: z.number().int() }),
+      inputSchema: extendInputSchema(config),
     }, async ({ previewId, lifetimeMinutes }) => {
       const preview = await service.extendOwned(userId, previewId, lifetimeMinutes);
       if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
@@ -70,7 +67,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
 
     server.registerTool('preview_delete', {
       description: 'Delete an owned preview.',
-      inputSchema: z.object({ previewId: z.string().min(1) }),
+      inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {
       const deleted = await service.deleteOwned(userId, previewId);
       if (!deleted) throw new ApplicationError('PREVIEW_NOT_FOUND');
@@ -102,7 +99,7 @@ export async function registerMcp(app: FastifyInstance, config: AppConfig, pool:
     if (host !== config.controlPlaneHost.toLowerCase()) return reply.code(404).send({ error: 'NOT_FOUND' });
     const userId = await tokens.authenticate(request.headers.authorization);
     if (!userId) return reply.code(401).header('WWW-Authenticate', 'Bearer').send({ error: 'INVALID_MCP_TOKEN' });
-    const handler = createMcpHttpHandler(service, userId);
+    const handler = createMcpHttpHandler(service, userId, config);
     const node = toNodeHandler(handler);
     return node(request.raw as any, reply.raw as any, request.body);
   });
