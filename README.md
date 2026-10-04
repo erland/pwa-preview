@@ -45,7 +45,7 @@ The application is available on `http://localhost:3000` and PostgreSQL is kept i
 
 ## Architecture
 
-The service separates an authenticated control plane from wildcard-hosted preview origins. Metadata uses PostgreSQL and preview files use an `ObjectStore` abstraction backed by a persistent local volume in v1.
+The service separates an authenticated control plane from wildcard-hosted preview origins. Metadata uses PostgreSQL and preview files use the filesystem-oriented `LocalPreviewStorage` contract backed by a persistent local volume. Local storage and single-active-instance deployment are deliberate near-term architecture choices.
 
 ## Database
 
@@ -75,9 +75,9 @@ The session cookie is `Secure`, `HttpOnly`, `SameSite=Lax` and deliberately host
 
 ## Local storage (Step 5)
 
-Preview files use an `ObjectStore` abstraction. The v1 implementation, `LocalVolumeObjectStore`, stores data below `DATA_ROOT` using separate `previews/`, `staging/`, and `tmp/` roots. Storage keys are generated server-side with 128 bits of randomness and are validated before they can influence filesystem paths. `DATA_ROOT=/` is rejected.
+Preview files use the filesystem-oriented `LocalPreviewStorage` contract. The implementation, `LocalVolumeObjectStore`, stores data below `DATA_ROOT` using separate `previews/`, `staging/`, and `tmp/` roots. The contract intentionally exposes local directory paths and atomic replacement semantics that depend on rename operations within the same filesystem. It is not intended to model S3/R2/MinIO. Storage keys are generated server-side with 128 bits of randomness and are validated before they can influence filesystem paths. `DATA_ROOT=/` is rejected.
 
-Docker Compose mounts a persistent `preview-data` volume at `/data`. Artifact extraction and publish/update semantics are intentionally deferred to later steps; Step 5 only establishes safe storage primitives.
+Docker Compose mounts a persistent `preview-data` volume at `/data`. A future move to remote/shared storage should be treated as a separate architecture change with a new storage contract and distributed-concurrency design rather than as another implementation of `LocalPreviewStorage`.
 
 
 ## Artifact ingestion (Step 6)
