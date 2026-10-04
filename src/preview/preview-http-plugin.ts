@@ -7,7 +7,7 @@ import multipart from '@fastify/multipart';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import type { ObjectStore } from '../storage/object-store.js';
+import type { LocalPreviewStorage } from '../storage/local-preview-storage.js';
 import { requireAuth } from '../auth/auth-plugin.js';
 import type { PreviewService } from './preview-service.js';
 import { resolvePreviewIdFromHost } from './preview-host-resolver.js';
@@ -39,7 +39,7 @@ export async function registerPreviewHttp(
   config: AppConfig,
   service: PreviewService,
   repository: PreviewRepository,
-  store: ObjectStore,
+  store: LocalPreviewStorage,
 ): Promise<void> {
   await app.register(multipart, { limits: { fileSize: config.maxCompressedBytes, files: 1, fields: 4 } });
 
