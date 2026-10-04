@@ -24,7 +24,7 @@ export class AllowlistRepository {
          SELECT 'github', email, true
          FROM desired
          ON CONFLICT ((coalesce(provider, '')), lower(email))
-         DO UPDATE SET enabled = true, updated_at = now()
+         DO UPDATE SET email = EXCLUDED.email, enabled = true, updated_at = now()
          RETURNING 1
        )
        UPDATE allowlist_entries AS existing
