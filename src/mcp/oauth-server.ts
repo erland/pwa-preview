@@ -42,7 +42,7 @@ function requestPath(request: FastifyRequest): string {
 
 export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, pool: DatabasePool): Promise<void> {
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
-    try { done(null, Object.fromEntries(new URLSearchParams(body))); }
+    try { done(null, Object.fromEntries(new URLSearchParams(String(body)))); }
     catch (error) { done(error as Error, undefined); }
   });
   const issuer = `https://${config.controlPlaneHost}`;
