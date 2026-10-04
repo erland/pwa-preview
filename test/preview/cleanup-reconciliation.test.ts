@@ -26,21 +26,52 @@ describe('cleanup/reconciliation',()=>{
     const deleting='p-'+ 'b'.repeat(32), creating='p-'+ 'c'.repeat(32), orphan='p-'+ 'd'.repeat(32);
     for (const id of [deleting,creating,orphan]) { const k=previewStorageKeyFromId(id); await store.createPreviewArea(k); await writeFile(path.join(store.getPreviewSiteRoot(k),'index.html'),'x'); }
     const staging=await store.createStagingArea(); const old=new Date(Date.now()-2*60*60*1000); await utimes(path.dirname(store.getStagingSiteRoot(staging)),old,old);
-    const calls:{deleted:string[]; failed:string[]}={deleted:[],failed:[]};
+    const calls:{deleted:string[]}={deleted:[]};
     const repo:any={
-      listByStatus: async()=>[preview(deleting,'DELETING')], listStaleCreating: async()=>[preview(creating,'CREATING')],
-      listActiveIds: async()=>[deleting,creating], markDeletedSystemFromDeleting: async(id:string)=>{ calls.deleted.push(id); return true; }, markFailedFromCreating: async(id:string)=>{ calls.failed.push(id); return true; },
+      listByStatus: async()=>[preview(deleting,'DELETING')],
+      claimStaleCreating: async()=>[preview(creating,'FAILED')],
+      listActiveIds: async()=>[deleting,creating],
+      isActiveId: async(id:string)=>id===deleting || id===creating,
+      markDeletedSystemFromDeleting: async(id:string)=>{ calls.deleted.push(id); return true; },
     };
     const result=await new ReconciliationJob(repo,store).runOnce({staleCreatingBefore:new Date(),staleStagingBefore:new Date(Date.now()-60*60*1000)});
     expect(result).toEqual({completedDeleting:1,failedCreating:1,deletedOrphanPreviews:1,deletedStaging:1});
-    expect(calls.deleted).toEqual([deleting]); expect(calls.failed).toEqual([creating]);
+    expect(calls.deleted).toEqual([deleting]);
   });
 
   it('leaves active preview storage alone', async()=>{
     const root=await mkdtemp(path.join(tmpdir(),'reconcile-active-')); roots.push(root); const store=new LocalVolumeObjectStore(root); await store.initialize();
     const id='p-'+ 'e'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'alive');
-    const repo:any={ listByStatus:async()=>[], listStaleCreating:async()=>[], listActiveIds:async()=>[id] };
+    const repo:any={ listByStatus:async()=>[], claimStaleCreating:async()=>[], listActiveIds:async()=>[id], isActiveId:async()=>true };
     await new ReconciliationJob(repo,store).runOnce({staleCreatingBefore:new Date(),staleStagingBefore:new Date(0)});
     expect(await readFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'utf8')).toBe('alive');
   });
+  it('does not delete files when a stale CREATING preview loses the claim race', async()=>{
+    const root=await mkdtemp(path.join(tmpdir(),'reconcile-race-')); roots.push(root); const store=new LocalVolumeObjectStore(root); await store.initialize();
+    const id='p-'+ 'f'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'ready');
+    const repo:any={
+      listByStatus:async()=>[],
+      claimStaleCreating:async()=>[],
+      listActiveIds:async()=>[id],
+      isActiveId:async()=>true,
+    };
+    const result=await new ReconciliationJob(repo,store).runOnce({staleCreatingBefore:new Date(),staleStagingBefore:new Date(0)});
+    expect(result.failedCreating).toBe(0);
+    expect(await readFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'utf8')).toBe('ready');
+  });
+
+  it('rechecks orphan candidates against current metadata before deleting storage', async()=>{
+    const root=await mkdtemp(path.join(tmpdir(),'reconcile-orphan-race-')); roots.push(root); const store=new LocalVolumeObjectStore(root); await store.initialize();
+    const id='p-'+ 'g'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'published');
+    const repo:any={
+      listByStatus:async()=>[],
+      claimStaleCreating:async()=>[],
+      listActiveIds:async()=>[],
+      isActiveId:async(candidate:string)=>candidate===id,
+    };
+    const result=await new ReconciliationJob(repo,store).runOnce({staleCreatingBefore:new Date(),staleStagingBefore:new Date(0)});
+    expect(result.deletedOrphanPreviews).toBe(0);
+    expect(await readFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'utf8')).toBe('published');
+  });
+
 });
