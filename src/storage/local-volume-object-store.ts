@@ -10,7 +10,7 @@ function assertSafeDataRoot(dataRoot: string): string {
   return resolved;
 }
 
-export class LocalVolumeLocalPreviewStorage implements LocalPreviewStorage {
+export class LocalVolumeObjectStore implements LocalPreviewStorage {
   readonly dataRoot: string;
   readonly previewsRoot: string;
   readonly stagingRoot: string;
