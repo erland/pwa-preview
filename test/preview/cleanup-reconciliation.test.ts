@@ -62,7 +62,7 @@ describe('cleanup/reconciliation',()=>{
 
   it('rechecks orphan candidates against current metadata before deleting storage', async()=>{
     const root=await mkdtemp(path.join(tmpdir(),'reconcile-orphan-race-')); roots.push(root); const store=new LocalVolumeObjectStore(root); await store.initialize();
-    const id='p-'+ 'g'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'published');
+    const id='p-'+ '9'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'published');
     const repo:any={
       listByStatus:async()=>[],
       claimStaleCreating:async()=>[],
