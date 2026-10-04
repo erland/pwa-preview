@@ -2,7 +2,7 @@
 
 ## Authentication
 
-Browser/REST management uses the secure host-only session created by GitHub OAuth. MCP uses a personal Bearer token issued by an authenticated browser session.
+Browser/REST management uses the secure host-only session created by GitHub OAuth. MCP supports OAuth 2.0 Authorization Code with PKCE for interactive clients such as ChatGPT, and personal Bearer tokens remain available for scripts and troubleshooting.
 
 Preview rendering itself is public in v1 via the unguessable preview hostname; management is authenticated.
 
@@ -36,7 +36,31 @@ All management operations derive the owner from server-side auth context. Client
 - `POST /api/mcp-tokens`
 - `DELETE /api/mcp-tokens`
 
-Token plaintext is returned only when issued. PostgreSQL stores only its SHA-256 hash.
+Token plaintext is returned only when issued. PostgreSQL stores only its SHA-256 hash. The web UI exposes controls to issue, copy and revoke these tokens.
+
+### MCP OAuth
+
+OAuth discovery:
+
+- `GET /.well-known/oauth-authorization-server`
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-protected-resource/mcp`
+
+OAuth endpoints:
+
+- `POST /register` — dynamic client registration for public PKCE clients
+- `GET /authorize` — authorization code flow; reuses the existing GitHub login and allowlist
+- `POST /token` — authorization-code and refresh-token grants
+
+The required scope is `mcp`. PKCE `S256` is mandatory. Access tokens are short-lived MCP bearer tokens and refresh tokens are rotated when used.
+
+For ChatGPT, configure the MCP server URL as:
+
+```text
+https://<CONTROL_PLANE_HOST>/mcp
+```
+
+ChatGPT can discover the OAuth authorization server from the MCP 401 response and protected-resource metadata.
 
 ## MCP
 
