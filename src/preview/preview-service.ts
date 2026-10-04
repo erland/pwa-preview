@@ -10,6 +10,7 @@ import { createPreviewId } from './preview-id.js';
 import { PreviewPublisher } from './preview-publisher.js';
 import { UrlArtifactSource } from '../artifact/url-artifact-source.js';
 import { ApplicationError } from '../errors/application-error.js';
+import { normalizePreviewName } from './preview-input.js';
 
 const importCounts = new Map<string, number>();
 const createLocks = new Map<string, Promise<void>>();
@@ -109,13 +110,14 @@ export class PreviewService {
 
   private async createFromArtifact(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview> {
     const lifetime = input.lifetimeMinutes ?? this.config.ttlDefaultMinutes;
+    const displayName = input.displayName == null ? null : normalizePreviewName(input.displayName);
     if (!Number.isInteger(lifetime) || lifetime < this.config.ttlMinMinutes || lifetime > this.config.ttlMaxMinutes) throw new ApplicationError('INVALID_TTL');
     const id = createPreviewId();
     const hostname = `${id}.${this.config.previewDomainSuffix}`;
     const expiresAt = new Date(Date.now() + lifetime * 60_000);
     await withCreateLock(input.ownerUserId, async () => {
       await this.assertActivePreviewCapacity(input.ownerUserId);
-      await this.repository.create({ id, ownerUserId: input.ownerUserId, hostname, expiresAt, sourceType: input.sourceType, displayName: input.displayName ?? null });
+      await this.repository.create({ id, ownerUserId: input.ownerUserId, hostname, expiresAt, sourceType: input.sourceType, displayName });
     });
     let stagingKey: Awaited<ReturnType<ArchiveImporter['importFromFile']>>['stagingKey'] | undefined;
     try {
