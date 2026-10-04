@@ -15,6 +15,7 @@ declare module '@fastify/secure-session' {
   interface SessionData {
     userId?: string;
     oauthStateHash?: string;
+    oauthReturnTo?: string;
   }
 }
 
@@ -62,6 +63,8 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
   });
 
   app.get('/auth/login/github', async (request, reply) => {
+    const query = request.query as { returnTo?: string };
+    request.session.set('oauthReturnTo', query.returnTo?.startsWith('/authorize?') ? query.returnTo : '');
     const state = randomBytes(24).toString('base64url');
     request.session.set('oauthStateHash', stateHash(state));
     const callback = `https://${options.config.controlPlaneHost}/auth/callback/github`;
@@ -86,7 +89,9 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
       const identity = await github.fetchIdentity(token);
       const { userId } = await users.loginWithGithub(identity);
       request.session.set('userId', userId);
-      return reply.redirect('/');
+      const returnTo = request.session.get('oauthReturnTo');
+      request.session.set('oauthReturnTo', '');
+      return reply.redirect(typeof returnTo === 'string' && returnTo.startsWith('/authorize?') ? returnTo : '/');
     } catch (error) {
       if (error instanceof AccessDeniedError) return reply.code(403).send({ error: error.message });
       request.log.warn({ err: error }, 'github oauth callback failed');

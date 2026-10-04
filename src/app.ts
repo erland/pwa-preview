@@ -8,6 +8,7 @@ import type { GithubClient } from './auth/github-client.js';
 import { registerPreviewHttp } from './preview/preview-http-plugin.js';
 import { registerUi } from './ui/ui-plugin.js';
 import { registerMcp } from './mcp/server.js';
+import { registerMcpOAuth } from './mcp/oauth-server.js';
 import { classifyRequestPlane } from './http-host-policy.js';
 import { PreviewRepository } from './persistence/repositories/preview-repository.js';
 import { LocalVolumeObjectStore } from './storage/local-volume-object-store.js';
@@ -59,6 +60,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         ...(options.githubClient ? { githubClient: options.githubClient } : {}),
       });
       await registerPreviewHttp(scope, config, previewService, previewRepository, previewStore);
+      await registerMcpOAuth(scope, config, pool);
       await registerMcp(scope, config, pool, previewService);
       await registerUi(scope);
     });

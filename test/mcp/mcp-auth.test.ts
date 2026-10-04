@@ -25,6 +25,7 @@ describe('MCP endpoint auth', () => {
     await registerMcp(app, config, pool, service);
     const response = await app.inject({ method:'POST', url:'/mcp', headers:{ host:'control.test', 'content-type':'application/json' }, payload:{ jsonrpc:'2.0', id:1, method:'tools/list', params:{} } });
     expect(response.statusCode).toBe(401);
+    expect(response.headers['www-authenticate']).toContain('/.well-known/oauth-protected-resource/mcp');
     expect(response.json()).toEqual({ error:'INVALID_MCP_TOKEN' });
     await app.close();
   });

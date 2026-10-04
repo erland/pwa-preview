@@ -60,6 +60,7 @@ function App() {
   const [ttl, setTtl] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [mcpToken, setMcpToken] = useState<{ token: string; expiresAt: string } | null>(null);
 
   const sorted = useMemo(() => [...previews].sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [previews]);
 
@@ -92,6 +93,34 @@ function App() {
       setMe(null);
     });
   }, []);
+
+  async function createMcpToken() {
+    setBusy('mcp-token'); setError(null);
+    try {
+      const issued = await api<{ token: string; expiresAt: string }>('/api/mcp-tokens', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ days: 90 }),
+      });
+      setMcpToken(issued);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte skapa MCP-token'); }
+    finally { setBusy(null); }
+  }
+
+  async function revokeMcpTokens() {
+    if (!confirm('Återkalla alla aktiva MCP bearer tokens?')) return;
+    setBusy('mcp-revoke'); setError(null);
+    try {
+      await api('/api/mcp-tokens', { method: 'DELETE' });
+      setMcpToken(null);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte återkalla MCP-token'); }
+    finally { setBusy(null); }
+  }
+
+  async function copyMcpToken() {
+    if (!mcpToken) return;
+    await navigator.clipboard.writeText(mcpToken.token);
+  }
 
   async function createPreview(event: FormEvent) {
     event.preventDefault();
@@ -172,6 +201,21 @@ function App() {
       </header>
 
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
+
+      <section className="access-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Integration</p><h2>MCP access</h2></div>
+          <div className="header-actions">
+            <button className="button ghost" onClick={createMcpToken} disabled={busy==='mcp-token'}>{busy==='mcp-token'?'Skapar…':'Skapa bearer token'}</button>
+            <button className="button danger" onClick={revokeMcpTokens} disabled={busy==='mcp-revoke'}>Återkalla tokens</button>
+          </div>
+        </div>
+        <p className="access-help">ChatGPT kan ansluta med OAuth mot <code>{'https://' + window.location.host + '/mcp'}</code>. Bearer token finns kvar för script, felsökning och andra MCP-klienter.</p>
+        {mcpToken && <div className="token-box">
+          <div><span>Bearer token — visas bara nu</span><code>{mcpToken.token}</code><small>Giltig till {formatDate(mcpToken.expiresAt)}</small></div>
+          <button className="button ghost" onClick={copyMcpToken}>Kopiera</button>
+        </div>}
+      </section>
 
       <section className="create-card">
         <div className="section-heading"><div><p className="eyebrow">Ny preview</p><h2>Publicera statiskt innehåll</h2></div><div className="segmented"><button className={mode==='upload'?'active':''} onClick={() => setMode('upload')}>Fil</button><button className={mode==='url'?'active':''} onClick={() => setMode('url')}>URL</button></div></div>
