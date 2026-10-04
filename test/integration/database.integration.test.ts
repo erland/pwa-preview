@@ -101,4 +101,26 @@ integration('PostgreSQL persistence', () => {
     expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
   });
 
+  test('stale creating reconciliation claims only rows still creating', async () => {
+    const users = new UserRepository(pool);
+    const previews = new PreviewRepository(pool);
+    const owner = await users.create();
+    const staleBefore = new Date(Date.now() - 60_000);
+    const old = new Date(Date.now() - 120_000);
+
+    const staleId='p-stalecreating1234567890';
+    await previews.create({ id:staleId, ownerUserId:owner.id, hostname:`${staleId}.preview.example`, expiresAt:new Date(Date.now()+600_000), sourceType:'UPLOAD' });
+    await pool.query('UPDATE previews SET updated_at=$2 WHERE id=$1', [staleId, old]);
+
+    const readyId='p-staleready1234567890abc';
+    await previews.create({ id:readyId, ownerUserId:owner.id, hostname:`${readyId}.preview.example`, expiresAt:new Date(Date.now()+600_000), sourceType:'UPLOAD', status:'READY' });
+    await pool.query('UPDATE previews SET updated_at=$2 WHERE id=$1', [readyId, old]);
+
+    const claimed = await previews.claimStaleCreating(staleBefore, 100);
+    expect(claimed.map((p)=>p.id)).toContain(staleId);
+    expect(claimed.map((p)=>p.id)).not.toContain(readyId);
+    expect((await previews.findOwnedById(owner.id, staleId))?.status).toBe('FAILED');
+    expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
+  });
+
 });
