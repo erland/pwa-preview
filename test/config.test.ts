@@ -36,6 +36,24 @@ describe('configuration', () => {
   });
 
 
+  it('leaves GitHub allowlist sync disabled when the variable is absent or empty', () => {
+    expect(loadConfig(baseEnv).githubAllowlistEmails).toBeUndefined();
+    expect(loadConfig({ ...baseEnv, PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS: '   ' }).githubAllowlistEmails).toBeUndefined();
+  });
+
+  it('parses, normalizes and deduplicates configured GitHub allowlist emails', () => {
+    const config = loadConfig({
+      ...baseEnv,
+      PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS: ' User@Example.Test,second@example.test,user@example.test ',
+    });
+    expect(config.githubAllowlistEmails).toEqual(['user@example.test', 'second@example.test']);
+  });
+
+  it('rejects malformed configured GitHub allowlist emails', () => {
+    expect(() => loadConfig({ ...baseEnv, PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS: 'not-an-email' }))
+      .toThrow('PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS must contain comma-separated email addresses');
+  });
+
   it('rejects preview hosts inside the control-plane registrable domain', () => {
     expect(() => loadConfig({ ...baseEnv, PREVIEW_DOMAIN_SUFFIX: 'preview.example.test' }))
       .toThrow('PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain');

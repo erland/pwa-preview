@@ -2,6 +2,7 @@ import { buildApp } from './app.js';
 import { loadConfig, safeConfigSummary } from './config.js';
 import { createDatabasePool, runMigrations } from './persistence/db.js';
 import { PreviewRepository } from './persistence/repositories/preview-repository.js';
+import { AllowlistRepository } from './persistence/repositories/allowlist-repository.js';
 import { LocalVolumeObjectStore } from './storage/local-volume-object-store.js';
 import { CleanupJob } from './preview/cleanup-job.js';
 import { ReconciliationJob } from './preview/reconciliation-job.js';
@@ -19,6 +20,11 @@ try {
 
 const pool = createDatabasePool(config.databaseUrl);
 if (config.migrateOnStart) await runMigrations(pool);
+
+if (config.githubAllowlistEmails) {
+  const allowlistRepository = new AllowlistRepository(pool);
+  await allowlistRepository.syncGitHub(config.githubAllowlistEmails);
+}
 
 const store = new LocalVolumeObjectStore(config.dataRoot);
 await store.initialize();

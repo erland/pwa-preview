@@ -38,6 +38,36 @@ integration('PostgreSQL persistence', () => {
     expect(await repo.isAllowed('allowed@example.test','google')).toBe(false);
   });
 
+  test('GitHub allowlist sync is authoritative only for GitHub-scoped entries', async () => {
+    const repo = new AllowlistRepository(pool);
+    await repo.add('old@example.test', 'github');
+    await repo.add('neutral@example.test', null);
+
+    await repo.syncGitHub(['Allowed@Example.Test', 'second@example.test']);
+    await repo.syncGitHub(['allowed@example.test', 'second@example.test']);
+
+    expect(await repo.isAllowed('allowed@example.test', 'github')).toBe(true);
+    expect(await repo.isAllowed('second@example.test', 'github')).toBe(true);
+    expect(await repo.isAllowed('old@example.test', 'github')).toBe(false);
+    expect(await repo.isAllowed('neutral@example.test', 'github')).toBe(true);
+
+    const githubRows = await pool.query<{ email: string; enabled: boolean }>(
+      "SELECT email, enabled FROM allowlist_entries WHERE provider = 'github' ORDER BY lower(email)",
+    );
+    expect(githubRows.rows).toEqual([
+      { email: 'allowed@example.test', enabled: true },
+      { email: 'old@example.test', enabled: false },
+      { email: 'second@example.test', enabled: true },
+    ]);
+  });
+
+  test('empty GitHub allowlist sync is a no-op', async () => {
+    const repo = new AllowlistRepository(pool);
+    await repo.add('keep@example.test', 'github');
+    await repo.syncGitHub([]);
+    expect(await repo.isAllowed('keep@example.test', 'github')).toBe(true);
+  });
+
   test('preview repository enforces owner scope', async () => {
     const users = new UserRepository(pool); const previews = new PreviewRepository(pool);
     const owner = await users.create(); const other = await users.create();

@@ -102,6 +102,7 @@ DATA_ROOT=/data
 SESSION_SECRET=<at least 32 random characters>
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
+PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
 MIGRATE_ON_START=false
 ```
 
@@ -131,7 +132,10 @@ DATABASE_URL=postgres://pwa_preview:<password>@<shared-postgres-host>:5432/pwa_p
 SESSION_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
+PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
 ```
+
+`PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS` is optional. If it is set to a non-empty comma-separated list, startup synchronizes that list as the authoritative enabled GitHub-scoped allowlist. If it is omitted or empty, startup leaves the database allowlist untouched.
 
 `PWA_PREVIEW_VERSION` selects the GHCR image tag. For deterministic deployments, use an immutable release version such as `1.0.0` rather than `latest`.
 
