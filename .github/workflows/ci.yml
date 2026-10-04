@@ -72,3 +72,7 @@ jobs:
           tags: pwa-preview:ci
       - name: Verify native runtime dependencies
         run: docker run --rm pwa-preview:ci node -e "require('sodium-native'); console.log('sodium-native loaded')"
+      - name: Verify healthcheck runtime dependency
+        run: |
+          docker inspect pwa-preview:ci --format '{{json .Config.Healthcheck.Test}}' | grep -q '"node"'
+          ! docker inspect pwa-preview:ci --format '{{json .Config.Healthcheck.Test}}' | grep -q '"wget"'
