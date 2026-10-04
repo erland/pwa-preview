@@ -7,6 +7,7 @@ import type { DatabasePool } from '../persistence/db.js';
 import type { PreviewService } from '../preview/preview-service.js';
 import { requireAuth } from '../auth/auth-plugin.js';
 import { McpTokenService } from './token-service.js';
+import { ApplicationError } from '../errors/application-error.js';
 
 function asOutput(preview: any) {
   return {
@@ -60,7 +61,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
       inputSchema: z.object({ previewId: z.string().min(1) }),
     }, async ({ previewId }) => {
       const preview = await service.getOwned(userId, previewId);
-      if (!preview) throw new Error('PREVIEW_NOT_FOUND');
+      if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
       return result(asOutput(preview));
     });
 
@@ -69,7 +70,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
       inputSchema: z.object({ previewId: z.string().min(1), sourceUrl: z.string().url() }),
     }, async ({ previewId, sourceUrl }) => {
       const preview = await service.updateFromUrl({ ownerUserId: userId, previewId, sourceUrl });
-      if (!preview) throw new Error('PREVIEW_NOT_FOUND');
+      if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
       return result(asOutput(preview));
     });
 
@@ -78,7 +79,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
       inputSchema: z.object({ previewId: z.string().min(1), lifetimeMinutes: z.number().int() }),
     }, async ({ previewId, lifetimeMinutes }) => {
       const preview = await service.extendOwned(userId, previewId, lifetimeMinutes);
-      if (!preview) throw new Error('PREVIEW_NOT_FOUND');
+      if (!preview) throw new ApplicationError('PREVIEW_NOT_FOUND');
       return result(asOutput(preview));
     });
 
@@ -87,7 +88,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string) {
       inputSchema: z.object({ previewId: z.string().min(1) }),
     }, async ({ previewId }) => {
       const deleted = await service.deleteOwned(userId, previewId);
-      if (!deleted) throw new Error('PREVIEW_NOT_FOUND');
+      if (!deleted) throw new ApplicationError('PREVIEW_NOT_FOUND');
       return result({ previewId, deleted: true });
     });
 
