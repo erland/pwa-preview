@@ -1,9 +1,9 @@
 import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import type { ObjectStore } from '../storage/object-store.js';
+import type { LocalPreviewStorage } from '../storage/local-preview-storage.js';
 import { previewStorageKeyFromId } from '../storage/storage-key.js';
 
 export class CleanupJob {
-  constructor(private readonly repository: PreviewRepository, private readonly store: ObjectStore) {}
+  constructor(private readonly repository: PreviewRepository, private readonly store: LocalPreviewStorage) {}
 
   async runOnce(batchSize = 50): Promise<number> {
     const expired = await this.repository.claimExpired(batchSize);

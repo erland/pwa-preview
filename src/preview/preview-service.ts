@@ -4,7 +4,7 @@ import type { AppConfig } from '../config.js';
 import type { Preview } from '../domain/models.js';
 import { ArchiveImporter } from '../artifact/archive-importer.js';
 import type { PreviewRepository } from '../persistence/repositories/preview-repository.js';
-import type { ObjectStore } from '../storage/object-store.js';
+import type { LocalPreviewStorage } from '../storage/local-preview-storage.js';
 import { previewStorageKey, type StagingKey } from '../storage/storage-key.js';
 import { createPreviewId } from './preview-id.js';
 import { PreviewPublisher } from './preview-publisher.js';
@@ -73,7 +73,7 @@ export class PreviewService {
   constructor(
     private readonly config: AppConfig,
     private readonly repository: PreviewRepository,
-    private readonly store: ObjectStore,
+    private readonly store: LocalPreviewStorage,
   ) {
     this.importer = new ArchiveImporter(store, {
       maxCompressedBytes: config.maxCompressedBytes,

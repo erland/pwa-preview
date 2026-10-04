@@ -1,8 +1,8 @@
-import type { ObjectStore, PreviewReplacement } from '../storage/object-store.js';
+import type { LocalPreviewStorage, PreviewReplacement } from '../storage/local-preview-storage.js';
 import { previewStorageKey, type StagingKey } from '../storage/storage-key.js';
 
 export class PreviewPublisher {
-  constructor(private readonly store: ObjectStore) {}
+  constructor(private readonly store: LocalPreviewStorage) {}
 
   async publish(previewId: string, stagingKey: StagingKey): Promise<void> {
     const replacement = await this.prepareReplacement(previewId, stagingKey);

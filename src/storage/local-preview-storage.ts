@@ -1,11 +1,19 @@
 import type { PreviewStorageKey, StagingKey } from './storage-key.js';
 
+/**
+ * Filesystem-oriented preview storage contract for the v1 single-instance deployment.
+ *
+ * This interface intentionally exposes local directory paths and replacement semantics
+ * that rely on atomic rename within one filesystem. It is not a provider-neutral
+ * object-storage abstraction. A future S3/R2 or multi-instance design should introduce
+ * a different contract rather than emulate these path-based guarantees.
+ */
 export interface PreviewReplacement {
   commit(): Promise<void>;
   rollback(): Promise<void>;
 }
 
-export interface ObjectStore {
+export interface LocalPreviewStorage {
   initialize(): Promise<void>;
   createStagingArea(): Promise<StagingKey>;
   deleteStagingArea(key: StagingKey): Promise<void>;

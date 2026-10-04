@@ -27,7 +27,7 @@ AGENT_WORKSPACE_ARTIFACT_URL_V2='https://…' \
 npm run test:agent-workspace
 ```
 
-The smoke test uses the real URL downloader, SSRF validation, archive importer, local volume ObjectStore and PreviewService. It verifies create from v1, update on the same preview id from v2, and delete.
+The smoke test uses the real URL downloader, SSRF validation, archive importer, local-volume preview storage and PreviewService. It verifies create from v1, update on the same preview id from v2, and delete.
 
 ## ChatGPT/MCP sequence
 
