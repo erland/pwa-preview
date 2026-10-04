@@ -19,6 +19,15 @@ type Preview = {
 
 type Me = { userId: string };
 
+type RuntimeCapabilities = {
+  preview: {
+    ttlMinutes: { min: number; default: number; max: number };
+    name: { maxLength: number };
+    sourceUrl: { requiresHttps: true };
+  };
+  artifact: { maxCompressedBytes: number };
+};
+
 async function api<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const response = await fetch(input, { credentials: 'same-origin', ...init });
   if (!response.ok) {
@@ -42,12 +51,13 @@ function formatBytes(value: number | null) {
 
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [mode, setMode] = useState<'upload' | 'url'>('upload');
   const [name, setName] = useState('');
-  const [ttl, setTtl] = useState('30');
+  const [ttl, setTtl] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
@@ -64,10 +74,23 @@ function App() {
   }
 
   useEffect(() => {
-    api<Me>('/api/me').then((value) => {
-      setMe(value);
+    Promise.all([
+      api<RuntimeCapabilities>('/api/capabilities'),
+      api<Me>('/api/me').then((value) => ({ authenticated: true as const, value })).catch(() => ({ authenticated: false as const })),
+    ]).then(([runtime, identity]) => {
+      setCapabilities(runtime);
+      setTtl(String(runtime.preview.ttlMinutes.default));
+      if (!identity.authenticated) {
+        setMe(null);
+        return;
+      }
+      setMe(identity.value);
       return refresh();
-    }).catch(() => setMe(null));
+    }).catch((e) => {
+      setError(e instanceof Error ? e.message : 'Kunde inte läsa serverkonfiguration');
+      setCapabilities(null);
+      setMe(null);
+    });
   }, []);
 
   async function createPreview(event: FormEvent) {
@@ -76,6 +99,7 @@ function App() {
     try {
       if (mode === 'upload') {
         if (!file) throw new Error('Välj en ZIP- eller tar.gz-fil');
+        if (capabilities && file.size > capabilities.artifact.maxCompressedBytes) throw new Error('Filen är större än serverns tillåtna maxstorlek');
         const body = new FormData();
         body.append('artifact', file);
         body.append('lifetimeMinutes', ttl);
@@ -95,7 +119,8 @@ function App() {
   }
 
   async function extend(preview: Preview) {
-    const minutes = Number(prompt('Ny livslängd från nu, i minuter:', '30'));
+    if (!capabilities) return;
+    const minutes = Number(prompt('Ny livslängd från nu, i minuter:', String(capabilities.preview.ttlMinutes.default)));
     if (!Number.isFinite(minutes)) return;
     setBusy(preview.previewId); setError(null);
     try {
@@ -117,6 +142,7 @@ function App() {
     if (!chosen) return;
     setBusy(preview.previewId); setError(null);
     try {
+      if (capabilities && chosen.size > capabilities.artifact.maxCompressedBytes) throw new Error('Filen är större än serverns tillåtna maxstorlek');
       const body = new FormData(); body.append('artifact', chosen);
       await api(`/api/previews/${preview.previewId}/content`, { method: 'PUT', body });
       await refresh();
@@ -124,7 +150,8 @@ function App() {
     finally { setBusy(null); }
   }
 
-  if (me === undefined) return <main className="center"><div className="spinner" aria-label="Laddar" /></main>;
+  if (me === undefined || capabilities === undefined) return <main className="center"><div className="spinner" aria-label="Laddar" /></main>;
+  if (capabilities === null) return <main className="center"><div className="alert" role="alert">{error ?? 'Kunde inte läsa serverkonfiguration'}</div></main>;
   if (me === null) return (
     <main className="login-shell">
       <section className="login-card">
@@ -149,8 +176,8 @@ function App() {
       <section className="create-card">
         <div className="section-heading"><div><p className="eyebrow">Ny preview</p><h2>Publicera statiskt innehåll</h2></div><div className="segmented"><button className={mode==='upload'?'active':''} onClick={() => setMode('upload')}>Fil</button><button className={mode==='url'?'active':''} onClick={() => setMode('url')}>URL</button></div></div>
         <form className="create-grid" onSubmit={createPreview}>
-          <label>Namn<span>Valfritt</span><input value={name} onChange={e=>setName(e.target.value)} placeholder="Min prototyp" /></label>
-          <label>Livslängd<span>minuter</span><input type="number" min="5" max="1440" value={ttl} onChange={e=>setTtl(e.target.value)} /></label>
+          <label>Namn<span>Valfritt</span><input value={name} maxLength={capabilities.preview.name.maxLength} onChange={e=>setName(e.target.value)} placeholder="Min prototyp" /></label>
+          <label>Livslängd<span>{capabilities.preview.ttlMinutes.min}–{capabilities.preview.ttlMinutes.max} minuter</span><input type="number" min={capabilities.preview.ttlMinutes.min} max={capabilities.preview.ttlMinutes.max} value={ttl} onChange={e=>setTtl(e.target.value)} /></label>
           {mode === 'upload' ? <label className="source-field">Artifact<span>ZIP eller tar.gz</span><input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>setFile(e.target.files?.[0] ?? null)} /></label> : <label className="source-field">HTTPS-URL<span>Signerad URL stöds</span><input type="url" value={sourceUrl} onChange={e=>setSourceUrl(e.target.value)} placeholder="https://…/artifact.zip" /></label>}
           <button className="button primary submit" disabled={busy==='create'}>{busy==='create'?'Publicerar…':'Skapa preview'}</button>
         </form>

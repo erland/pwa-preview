@@ -12,6 +12,7 @@ import { classifyRequestPlane } from './http-host-policy.js';
 import { PreviewRepository } from './persistence/repositories/preview-repository.js';
 import { LocalVolumeObjectStore } from './storage/local-volume-object-store.js';
 import { PreviewService } from './preview/preview-service.js';
+import { runtimeCapabilities } from './capabilities/runtime-capabilities.js';
 
 export type BuildAppOptions = Readonly<{
   config?: AppConfig;
@@ -49,6 +50,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       await previewStore.initialize();
       const previewRepository = new PreviewRepository(pool);
       const previewService = new PreviewService(config, previewRepository, previewStore);
+
+      scope.get('/api/capabilities', async () => runtimeCapabilities(config));
 
       await registerAuth(scope, {
         config,
