@@ -2,7 +2,7 @@
 
 ## Compose model
 
-Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application, pulls a pre-built image from GitHub Container Registry (GHCR), and assumes PostgreSQL is provided separately through `DATABASE_URL`.
+Use `compose.coolify.yaml` for production deployments in Coolify. It starts only the pwa-preview application, pulls a pre-built image from GitHub Container Registry (GHCR), and assumes PostgreSQL is provided separately. The Coolify Compose profile builds `DATABASE_URL` from explicit `DB_HOST`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` variables.
 
 Coolify does not build the application image. Publishing a GitHub Release triggers `.github/workflows/release-image.yml`, which builds the Docker image on GitHub-hosted runners and pushes it to `ghcr.io/erland/pwa-preview`.
 
@@ -88,7 +88,7 @@ Mount a persistent volume at:
 /data
 ```
 
-Use PostgreSQL 17 or later for metadata. The recommended Coolify setup reuses a shared PostgreSQL instance but gives pwa-preview its own database and user. Set `DATABASE_URL` to that database; `compose.coolify.yaml` does not start PostgreSQL itself.
+Use PostgreSQL 17 or later for metadata. The recommended Coolify setup reuses a shared PostgreSQL instance but gives pwa-preview its own database and user. Set the Coolify `DB_*` variables for that database; `compose.coolify.yaml` builds the application's `DATABASE_URL` and does not start PostgreSQL itself.
 
 This v1 architecture assumes one active pwa-preview application instance because `/data` is local persistent storage.
 
@@ -97,7 +97,10 @@ This v1 architecture assumes one active pwa-preview application instance because
 ```text
 CONTROL_PLANE_HOST=pwa-preview.apps.isaksson.info
 PREVIEW_DOMAIN_SUFFIX=previewapp.apphome.one
-DATABASE_URL=postgres://...
+DB_HOST=<shared-postgres-host>
+DB_USER=pwa_preview
+DB_PASSWORD=<password>
+DB_NAME=pwa_preview
 DATA_ROOT=/data
 SESSION_SECRET=<at least 32 random characters>
 GITHUB_CLIENT_ID=...
@@ -128,7 +131,10 @@ At minimum configure these values in Coolify rather than committing them to the 
 PWA_PREVIEW_VERSION=1.0.0
 CONTROL_PLANE_HOST=...
 PREVIEW_DOMAIN_SUFFIX=...
-DATABASE_URL=postgres://pwa_preview:<password>@<shared-postgres-host>:5432/pwa_preview
+DB_HOST=<shared-postgres-host>
+DB_USER=pwa_preview
+DB_PASSWORD=<password>
+DB_NAME=pwa_preview
 SESSION_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...

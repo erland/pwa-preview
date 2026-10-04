@@ -58,7 +58,10 @@ jobs:
           CONTROL_PLANE_HOST: pwa-preview.example.test
           CONTROL_PLANE_REGISTRABLE_DOMAIN: example.test
           PREVIEW_DOMAIN_SUFFIX: preview.example.test
-          DATABASE_URL: postgres://pwa_preview:test@postgres.example.test:5432/pwa_preview
+          DB_HOST: postgres.example.test
+          DB_USER: pwa_preview
+          DB_PASSWORD: test
+          DB_NAME: pwa_preview
           SESSION_SECRET: ci-session-secret-that-is-at-least-32-characters
           GITHUB_CLIENT_ID: ci-client
           GITHUB_CLIENT_SECRET: ci-secret
