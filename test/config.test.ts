@@ -75,9 +75,21 @@ describe('configuration', () => {
       .toThrow('PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS must contain comma-separated email addresses');
   });
 
-  it('rejects preview hosts inside the control-plane registrable domain', () => {
+  it('rejects preview hosts inside the control-plane registrable domain by default', () => {
     expect(() => loadConfig({ ...baseEnv, PREVIEW_DOMAIN_SUFFIX: 'preview.example.test' }))
-      .toThrow('PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain');
+      .toThrow('PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain unless ALLOW_SAME_SITE_PREVIEWS=true');
+  });
+
+  it('allows same-site preview hosts only with explicit opt-in', () => {
+    const config = loadConfig({
+      ...baseEnv,
+      CONTROL_PLANE_HOST: 'pwa-preview.apphome.one',
+      CONTROL_PLANE_REGISTRABLE_DOMAIN: 'apphome.one',
+      PREVIEW_DOMAIN_SUFFIX: 'preview.apphome.one',
+      ALLOW_SAME_SITE_PREVIEWS: 'true',
+    });
+    expect(config.allowSameSitePreviews).toBe(true);
+    expect(config.previewDomainSuffix).toBe('preview.apphome.one');
   });
 
   it('rejects a control-plane host outside its declared registrable domain', () => {

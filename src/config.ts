@@ -8,6 +8,7 @@ export type AppConfig = Readonly<{
   githubClientId: string;
   githubClientSecret: string;
   githubAllowlistEmails?: readonly string[];
+  allowSameSitePreviews?: boolean;
   ttlMinMinutes: number;
   ttlDefaultMinutes: number;
   ttlMaxMinutes: number;
@@ -114,12 +115,13 @@ export function loadConfig(env: Env = process.env): AppConfig {
   const controlPlaneHost = host(required(env, 'CONTROL_PLANE_HOST'), 'CONTROL_PLANE_HOST');
   const controlPlaneRegistrableDomain = host(required(env, 'CONTROL_PLANE_REGISTRABLE_DOMAIN'), 'CONTROL_PLANE_REGISTRABLE_DOMAIN');
   const previewDomainSuffix = host(required(env, 'PREVIEW_DOMAIN_SUFFIX'), 'PREVIEW_DOMAIN_SUFFIX');
+  const allowSameSitePreviews = booleanValue(env, 'ALLOW_SAME_SITE_PREVIEWS', false);
 
   if (controlPlaneHost !== controlPlaneRegistrableDomain && !controlPlaneHost.endsWith(`.${controlPlaneRegistrableDomain}`)) {
     throw new Error('Invalid configuration: CONTROL_PLANE_HOST must be within CONTROL_PLANE_REGISTRABLE_DOMAIN');
   }
-  if (previewDomainSuffix === controlPlaneRegistrableDomain || previewDomainSuffix.endsWith(`.${controlPlaneRegistrableDomain}`)) {
-    throw new Error('Invalid configuration: PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain');
+  if (!allowSameSitePreviews && (previewDomainSuffix === controlPlaneRegistrableDomain || previewDomainSuffix.endsWith(`.${controlPlaneRegistrableDomain}`))) {
+    throw new Error('Invalid configuration: PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain unless ALLOW_SAME_SITE_PREVIEWS=true');
   }
 
   return Object.freeze({
@@ -132,6 +134,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     githubClientId: required(env, 'GITHUB_CLIENT_ID'),
     githubClientSecret: required(env, 'GITHUB_CLIENT_SECRET'),
     ...(optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS') ? { githubAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS')! } : {}),
+    allowSameSitePreviews,
     ttlMinMinutes,
     ttlDefaultMinutes,
     ttlMaxMinutes,
@@ -158,6 +161,7 @@ export function safeConfigSummary(config: AppConfig): Record<string, string | nu
     controlPlaneHost: config.controlPlaneHost,
     controlPlaneRegistrableDomain: config.controlPlaneRegistrableDomain,
     previewDomainSuffix: config.previewDomainSuffix,
+    allowSameSitePreviews: String(config.allowSameSitePreviews),
     dataRoot: config.dataRoot,
     ttlMinMinutes: config.ttlMinMinutes,
     ttlDefaultMinutes: config.ttlDefaultMinutes,

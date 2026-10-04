@@ -42,6 +42,17 @@ This produces preview hosts under:
 
 Only these host classes are accepted by the application. Unknown hosts return 404. The control-plane session cookie is host-only and therefore is not sent to preview hosts.
 
+By default, pwa-preview requires the preview suffix to use a different registrable domain from the control plane. This is the recommended security model for untrusted preview content. For a single-user or otherwise explicitly trusted deployment, `ALLOW_SAME_SITE_PREVIEWS=true` can override this check. For example:
+
+```text
+CONTROL_PLANE_HOST=pwa-preview.apphome.one
+CONTROL_PLANE_REGISTRABLE_DOMAIN=apphome.one
+PREVIEW_DOMAIN_SUFFIX=preview.apphome.one
+ALLOW_SAME_SITE_PREVIEWS=true
+```
+
+This override weakens site isolation and should be removed before allowing untrusted users to deploy preview content.
+
 ## DNS and TLS
 
 Create DNS records for both the preview base host and wildcard host, pointing at the Coolify/Traefik ingress. With `PREVIEW_DOMAIN_SUFFIX=preview.apphome.one` this is:
@@ -106,6 +117,7 @@ SESSION_SECRET=<at least 32 random characters>
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
+ALLOW_SAME_SITE_PREVIEWS=false
 MIGRATE_ON_START=false
 ```
 
@@ -139,9 +151,12 @@ SESSION_SECRET=...
 GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com
+ALLOW_SAME_SITE_PREVIEWS=false
 ```
 
 `PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS` is optional. If it is set to a non-empty comma-separated list, startup synchronizes that list as the authoritative enabled GitHub-scoped allowlist. If it is omitted or empty, startup leaves the database allowlist untouched.
+
+`ALLOW_SAME_SITE_PREVIEWS` defaults to `false`. Set it to `true` only when you explicitly accept the weaker isolation of hosting the control plane and preview content below the same registrable domain.
 
 `PWA_PREVIEW_VERSION` selects the GHCR image tag. For deterministic deployments, use an immutable release version such as `1.0.0` rather than `latest`.
 
