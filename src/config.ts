@@ -77,6 +77,18 @@ function host(value: string, key: string): string {
   return trimmed;
 }
 
+function databaseUrl(env: Env): string {
+  const explicit = env.DATABASE_URL?.trim();
+  if (explicit) return explicit;
+
+  const user = required(env, 'DB_USER');
+  const password = required(env, 'DB_PASSWORD');
+  const dbHost = required(env, 'DB_HOST');
+  const name = env.DB_NAME?.trim() || 'pwa_preview';
+
+  return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${dbHost}:5432/${encodeURIComponent(name)}`;
+}
+
 function absolutePath(value: string, key: string): string {
   if (!value.startsWith('/')) throw new Error(`Invalid configuration: ${key} must be an absolute path`);
   const normalized = value.replace(/\/$/, '') || '/';
@@ -114,7 +126,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     controlPlaneHost,
     controlPlaneRegistrableDomain,
     previewDomainSuffix,
-    databaseUrl: required(env, 'DATABASE_URL'),
+    databaseUrl: databaseUrl(env),
     dataRoot: absolutePath(env.DATA_ROOT?.trim() || '/data', 'DATA_ROOT'),
     sessionSecret,
     githubClientId: required(env, 'GITHUB_CLIENT_ID'),
