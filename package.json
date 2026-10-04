@@ -20,7 +20,8 @@
     "dev:ui": "vite",
     "test:security": "vitest run test/security test/integration/database.integration.test.ts",
     "test:e2e": "node -e \"if(!process.env.TEST_DATABASE_URL){console.error(\\\"TEST_DATABASE_URL is required for E2E\\\");process.exit(1)}\" && vitest run test/e2e",
-    "test:agent-workspace": "node -e \"if(!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V1||!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V2){console.error(\\\"AGENT_WORKSPACE_ARTIFACT_URL_V1 and _V2 are required\\\");process.exit(1)}\" && vitest run test/integration/agent-workspace-url.integration.test.ts"
+    "test:agent-workspace": "node -e \"if(!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V1||!process.env.AGENT_WORKSPACE_ARTIFACT_URL_V2){console.error(\\\"AGENT_WORKSPACE_ARTIFACT_URL_V1 and _V2 are required\\\");process.exit(1)}\" && vitest run test/integration/agent-workspace-url.integration.test.ts",
+    "plugin:build": "node scripts/build-plugin.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^9.2.1",
