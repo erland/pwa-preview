@@ -16,7 +16,7 @@ describe('cleanup/reconciliation',()=>{
   it('deletes claimed expired preview storage and marks it deleted', async()=>{
     const root=await mkdtemp(path.join(tmpdir(),'cleanup-')); roots.push(root); const store=new LocalVolumeObjectStore(root); await store.initialize();
     const id='p-'+ 'a'.repeat(32); const key=previewStorageKeyFromId(id); await store.createPreviewArea(key); await writeFile(path.join(store.getPreviewSiteRoot(key),'index.html'),'x');
-    const deleted:string[]=[]; const repo:any={ claimExpired: async()=>[preview(id,'EXPIRED')], markDeletedSystem: async(id:string)=>deleted.push(id) };
+    const deleted:string[]=[]; const repo:any={ claimExpired: async()=>[preview(id,'EXPIRED')], markDeletedSystemFromExpired: async(id:string)=>{ deleted.push(id); return true; } };
     expect(await new CleanupJob(repo,store).runOnce()).toBe(1); expect(deleted).toEqual([id]);
     await expect(readFile(path.join(store.getPreviewSiteRoot(key),'index.html'))).rejects.toBeTruthy();
   });
@@ -29,7 +29,7 @@ describe('cleanup/reconciliation',()=>{
     const calls:{deleted:string[]; failed:string[]}={deleted:[],failed:[]};
     const repo:any={
       listByStatus: async()=>[preview(deleting,'DELETING')], listStaleCreating: async()=>[preview(creating,'CREATING')],
-      listActiveIds: async()=>[deleting,creating], markDeletedSystem: async(id:string)=>calls.deleted.push(id), markFailed: async(id:string)=>calls.failed.push(id),
+      listActiveIds: async()=>[deleting,creating], markDeletedSystemFromDeleting: async(id:string)=>{ calls.deleted.push(id); return true; }, markFailedFromCreating: async(id:string)=>{ calls.failed.push(id); return true; },
     };
     const result=await new ReconciliationJob(repo,store).runOnce({staleCreatingBefore:new Date(),staleStagingBefore:new Date(Date.now()-60*60*1000)});
     expect(result).toEqual({completedDeleting:1,failedCreating:1,deletedOrphanPreviews:1,deletedStaging:1});
