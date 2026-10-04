@@ -125,12 +125,13 @@ export class PreviewService {
         await this.assertStorageCapacity(input.ownerUserId, imported.artifact.extractedSizeBytes, 0);
         const replacement = await this.publisher.prepareReplacement(id, stagingKey!);
         try {
-          const ready = await this.repository.markReady(id, {
+          const ready = await this.repository.markReadyFromCreating(id, {
             compressedSizeBytes: imported.artifact.compressedSizeBytes,
             extractedSizeBytes: imported.artifact.extractedSizeBytes,
             fileCount: imported.artifact.fileCount,
             sourceSha256: digest,
           });
+          if (!ready) throw new Error('PREVIEW_STATE_CHANGED');
           await replacement.commit();
           return ready;
         } catch (error) {
@@ -139,7 +140,7 @@ export class PreviewService {
         }
       });
     } catch (error) {
-      await this.repository.markFailed(id, error instanceof Error ? error.message.slice(0, 120) : 'IMPORT_FAILED').catch(() => undefined);
+      await this.repository.markFailedFromCreating(id, error instanceof Error ? error.message.slice(0, 120) : 'IMPORT_FAILED').catch(() => undefined);
       throw error;
     } finally {
       if (stagingKey) await this.store.deleteStagingArea(stagingKey).catch(() => undefined);
@@ -256,7 +257,7 @@ export class PreviewService {
       return existing?.status === 'DELETED';
     }
     await this.store.deletePreviewArea(previewStorageKey(previewId));
-    await this.repository.markDeletedOwned(ownerUserId, previewId);
+    await this.repository.markDeletedOwnedFromDeleting(ownerUserId, previewId);
     return true;
   }
 
