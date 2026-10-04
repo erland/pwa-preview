@@ -36,6 +36,27 @@ describe('configuration', () => {
   });
 
 
+  it('builds DATABASE_URL from runtime DB variables when DATABASE_URL is absent', () => {
+    const { DATABASE_URL: _databaseUrl, ...withoutDatabaseUrl } = baseEnv;
+    const config = loadConfig({
+      ...withoutDatabaseUrl,
+      DB_HOST: 'postgres.internal',
+      DB_USER: 'pwa_preview',
+      DB_PASSWORD: 'p@ss/word',
+      DB_NAME: 'pwa_preview',
+    });
+    expect(config.databaseUrl).toBe('postgres://pwa_preview:p%40ss%2Fword@postgres.internal:5432/pwa_preview');
+  });
+
+  it('keeps explicit DATABASE_URL supported', () => {
+    expect(loadConfig(baseEnv).databaseUrl).toBe(baseEnv.DATABASE_URL);
+  });
+
+  it('requires runtime DB variables when DATABASE_URL is absent', () => {
+    const { DATABASE_URL: _databaseUrl, ...withoutDatabaseUrl } = baseEnv;
+    expect(() => loadConfig(withoutDatabaseUrl)).toThrow('Missing required configuration: DB_USER');
+  });
+
   it('leaves GitHub allowlist sync disabled when the variable is absent or empty', () => {
     expect(loadConfig(baseEnv).githubAllowlistEmails).toBeUndefined();
     expect(loadConfig({ ...baseEnv, PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS: '   ' }).githubAllowlistEmails).toBeUndefined();
