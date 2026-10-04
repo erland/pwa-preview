@@ -8,7 +8,7 @@ export type AppConfig = Readonly<{
   githubClientId: string;
   githubClientSecret: string;
   githubAllowlistEmails?: readonly string[];
-  allowSameSitePreviews: boolean;
+  allowSameSitePreviews?: boolean;
   ttlMinMinutes: number;
   ttlDefaultMinutes: number;
   ttlMaxMinutes: number;
