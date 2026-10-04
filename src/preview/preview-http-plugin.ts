@@ -14,6 +14,7 @@ import { resolvePreviewIdFromHost } from './preview-host-resolver.js';
 import { classifyRequestPlane } from '../http-host-policy.js';
 import { servePreview } from './static-site-handler.js';
 import { isApplicationError } from '../errors/application-error.js';
+import { toPreviewOutput } from './preview-output.js';
 
 
 function errorCode(error: unknown, fallback: string): string {
@@ -27,22 +28,6 @@ function multipartFieldValue(fields: Record<string, unknown>, name: string): str
   return part?.type === 'field' && typeof part.value !== 'undefined' ? String(part.value) : undefined;
 }
 
-function previewResponse(preview: { id:string; hostname:string; displayName:string|null; status:string; createdAt:Date; updatedAt:Date; expiresAt:Date; compressedSizeBytes:number|null; extractedSizeBytes:number|null; fileCount:number|null; sourceSha256:string|null; sourceType:string }) {
-  return {
-    previewId: preview.id,
-    url: `https://${preview.hostname}`,
-    name: preview.displayName,
-    status: preview.status,
-    createdAt: preview.createdAt.toISOString(),
-    updatedAt: preview.updatedAt.toISOString(),
-    expiresAt: preview.expiresAt.toISOString(),
-    compressedSizeBytes: preview.compressedSizeBytes,
-    extractedSizeBytes: preview.extractedSizeBytes,
-    fileCount: preview.fileCount,
-    sourceSha256: preview.sourceSha256,
-    sourceType: preview.sourceType,
-  };
-}
 
 export async function registerPreviewHttp(
   app: FastifyInstance,
@@ -74,14 +59,14 @@ export async function registerPreviewHttp(
 
   app.get('/api/previews', { preHandler: requireAuth }, async (request) => {
     const previews = await service.listOwned(request.authContext!.userId);
-    return { previews: previews.map(previewResponse) };
+    return { previews: previews.map(toPreviewOutput) };
   });
 
   app.get('/api/previews/:id', { preHandler: requireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const preview = await service.getOwned(request.authContext!.userId, id);
     if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
-    return previewResponse(preview);
+    return toPreviewOutput(preview);
   });
 
   app.put('/api/previews/:id/content', { preHandler: requireAuth }, async (request, reply) => {
@@ -92,7 +77,7 @@ export async function registerPreviewHttp(
         if (typeof body.sourceUrl !== 'string' || !body.sourceUrl.trim()) return reply.code(400).send({ error: 'SOURCE_URL_REQUIRED' });
         const preview = await service.updateFromUrl({ ownerUserId: request.authContext!.userId, previewId: id, sourceUrl: body.sourceUrl.trim() });
         if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
-        return previewResponse(preview);
+        return toPreviewOutput(preview);
       }
       const part = await request.file();
       if (!part) return reply.code(400).send({ error: 'ARTIFACT_REQUIRED' });
@@ -103,7 +88,7 @@ export async function registerPreviewHttp(
         if (part.file.truncated) throw new Error('ARTIFACT_COMPRESSED_SIZE_LIMIT');
         const preview = await service.updateFromFile({ ownerUserId: request.authContext!.userId, previewId: id, archivePath });
         if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
-        return previewResponse(preview);
+        return toPreviewOutput(preview);
       } finally {
         await rm(dir, { recursive: true, force: true });
       }
@@ -122,7 +107,7 @@ export async function registerPreviewHttp(
     try {
       const preview = await service.extendOwned(request.authContext!.userId, id, lifetimeMinutes);
       if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
-      return previewResponse(preview);
+      return toPreviewOutput(preview);
     } catch (error) {
       const message = errorCode(error, 'PREVIEW_EXTEND_FAILED');
       return reply.code(message === 'INVALID_TTL' || message === 'INVALID_EXTENSION' ? 400 : 422).send({ error: message });
@@ -147,7 +132,7 @@ export async function registerPreviewHttp(
           ...(body.lifetimeMinutes !== undefined ? { lifetimeMinutes: Number(body.lifetimeMinutes) } : {}),
           ...(typeof body.name === 'string' && body.name.trim() ? { displayName: body.name.trim() } : {}),
         });
-        return reply.code(201).send({ previewId: preview.id, url: `https://${preview.hostname}`, createdAt: preview.createdAt.toISOString(), expiresAt: preview.expiresAt.toISOString(), status: preview.status });
+        return reply.code(201).send(toPreviewOutput(preview));
       } catch (error) {
         request.log.warn({ err: error instanceof Error ? error.message : 'url import failed' }, 'preview URL creation failed');
         const message = errorCode(error, 'PREVIEW_CREATE_FAILED');
@@ -171,13 +156,7 @@ export async function registerPreviewHttp(
         ...(lifetimeMinutes !== undefined ? { lifetimeMinutes } : {}),
         ...(typeof nameRaw === 'string' && nameRaw.trim() ? { displayName: nameRaw.trim() } : {}),
       });
-      return reply.code(201).send({
-        previewId: preview.id,
-        url: `https://${preview.hostname}`,
-        createdAt: preview.createdAt.toISOString(),
-        expiresAt: preview.expiresAt.toISOString(),
-        status: preview.status,
-      });
+      return reply.code(201).send(toPreviewOutput(preview));
     } catch (error) {
       request.log.warn({ err: error }, 'preview creation failed');
       const message = errorCode(error, 'PREVIEW_CREATE_FAILED');
