@@ -11,6 +11,8 @@ describe('control-plane UI', () => {
     expect(source).toContain('Uppdatera');
     expect(source).toContain('Förläng');
     expect(source).toContain('Radera');
+    expect(source).toContain('Skapa bearer token');
+    expect(source).toContain('Återkalla tokens');
   });
 
   it('has responsive mobile styles', async () => {
