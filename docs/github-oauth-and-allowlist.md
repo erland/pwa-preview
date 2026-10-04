@@ -31,7 +31,24 @@ Matching is case-insensitive for email.
 
 ## v1 administration
 
-There is no dedicated allowlist administration UI/API in v1. Administration is therefore an operator action in PostgreSQL.
+There is no dedicated allowlist administration UI/API in v1.
+
+For Coolify and other environment-driven deployments, the preferred bootstrap/sync mechanism is:
+
+```text
+PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com,second@example.com
+```
+
+When this variable is present and non-empty at application startup, pwa-preview treats it as the authoritative set of enabled **GitHub-scoped** allowlist entries:
+
+- listed addresses are inserted or re-enabled idempotently,
+- GitHub-scoped addresses omitted from the configured list are disabled,
+- matching is case-insensitive and configured addresses are normalized to lowercase,
+- provider-neutral entries (`provider IS NULL`) are not modified.
+
+If the variable is missing or empty, startup does **not** modify `allowlist_entries`. This makes it safe to leave the feature unused and avoids interpreting an accidentally empty Coolify variable as "disable everyone".
+
+Direct PostgreSQL administration remains available when environment-driven sync is not desired.
 
 Add a GitHub-scoped address:
 
