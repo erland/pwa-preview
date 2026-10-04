@@ -12,6 +12,32 @@ export class AllowlistRepository {
     return mapEntry(result.rows[0]!);
   }
 
+  async syncGitHub(emails: readonly string[]): Promise<void> {
+    if (emails.length === 0) return;
+    await this.pool.query(
+      `WITH desired(email) AS (
+         SELECT DISTINCT lower(trim(value))
+         FROM unnest($1::text[]) AS value
+       ),
+       upserted AS (
+         INSERT INTO allowlist_entries(provider, email, enabled)
+         SELECT 'github', email, true
+         FROM desired
+         ON CONFLICT ((coalesce(provider, '')), lower(email))
+         DO UPDATE SET enabled = true, updated_at = now()
+         RETURNING 1
+       )
+       UPDATE allowlist_entries AS existing
+       SET enabled = false, updated_at = now()
+       WHERE existing.provider = 'github'
+         AND existing.enabled = true
+         AND NOT EXISTS (
+           SELECT 1 FROM desired WHERE desired.email = lower(existing.email)
+         )`,
+      [emails],
+    );
+  }
+
   async isAllowed(email: string, provider: string): Promise<boolean> {
     const result = await this.pool.query<{ allowed: boolean }>(
       `SELECT EXISTS (
