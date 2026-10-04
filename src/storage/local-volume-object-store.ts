@@ -1,7 +1,7 @@
 import { cp, mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import type { ObjectStore, PreviewReplacement } from './object-store.js';
+import type { LocalPreviewStorage, PreviewReplacement } from './local-preview-storage.js';
 import { createStagingKey, type PreviewStorageKey, type StagingKey } from './storage-key.js';
 
 function assertSafeDataRoot(dataRoot: string): string {
@@ -10,7 +10,7 @@ function assertSafeDataRoot(dataRoot: string): string {
   return resolved;
 }
 
-export class LocalVolumeObjectStore implements ObjectStore {
+export class LocalVolumeLocalPreviewStorage implements LocalPreviewStorage {
   readonly dataRoot: string;
   readonly previewsRoot: string;
   readonly stagingRoot: string;
