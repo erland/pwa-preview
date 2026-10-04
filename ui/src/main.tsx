@@ -51,7 +51,7 @@ function formatBytes(value: number | null) {
 
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const [capabilities, setCapabilities] = useState<RuntimeCapabilities | undefined>(undefined);
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -88,6 +88,7 @@ function App() {
       return refresh();
     }).catch((e) => {
       setError(e instanceof Error ? e.message : 'Kunde inte läsa serverkonfiguration');
+      setCapabilities(null);
       setMe(null);
     });
   }, []);
@@ -141,6 +142,7 @@ function App() {
     if (!chosen) return;
     setBusy(preview.previewId); setError(null);
     try {
+      if (capabilities && chosen.size > capabilities.artifact.maxCompressedBytes) throw new Error('Filen är större än serverns tillåtna maxstorlek');
       const body = new FormData(); body.append('artifact', chosen);
       await api(`/api/previews/${preview.previewId}/content`, { method: 'PUT', body });
       await refresh();
@@ -149,6 +151,7 @@ function App() {
   }
 
   if (me === undefined || capabilities === undefined) return <main className="center"><div className="spinner" aria-label="Laddar" /></main>;
+  if (capabilities === null) return <main className="center"><div className="alert" role="alert">{error ?? 'Kunde inte läsa serverkonfiguration'}</div></main>;
   if (me === null) return (
     <main className="login-shell">
       <section className="login-card">
