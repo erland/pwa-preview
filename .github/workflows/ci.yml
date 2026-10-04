@@ -69,4 +69,7 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: pwa-preview:ci
+      - name: Verify native runtime dependencies
+        run: docker run --rm pwa-preview:ci node -e "require('sodium-native'); console.log('sodium-native loaded')"
