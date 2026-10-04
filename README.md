@@ -135,7 +135,7 @@ For local UI development, run `npm run dev:ui`. Production `npm run build` build
 
 ## MCP
 
-The remote MCP endpoint is `POST /mcp` (Streamable HTTP). It requires a personal Bearer token tied to a local user. An authenticated browser session can issue a token with `POST /api/mcp-tokens` and revoke all active tokens with `DELETE /api/mcp-tokens`. Tokens are stored only as SHA-256 hashes, expire by default after 90 days, and are revalidated against the active allowlist on every MCP request.
+The remote MCP endpoint is `POST /mcp` (Streamable HTTP). Interactive MCP clients such as ChatGPT can authenticate with OAuth 2.0 Authorization Code + PKCE using the built-in discovery, dynamic registration, authorization and token endpoints. OAuth reuses the existing GitHub login and allowlist. Personal Bearer tokens remain available for scripts and troubleshooting; authenticated users can issue/copy/revoke them from the web UI or through `POST /api/mcp-tokens` / `DELETE /api/mcp-tokens`. Token plaintext is only returned when issued and PostgreSQL stores token hashes.
 
 Tools: `preview_create`, `preview_list`, `preview_get`, `preview_update`, `preview_extend`, `preview_delete`. MCP create/update use HTTPS `sourceUrl`; tools never accept `ownerUserId`.
 
