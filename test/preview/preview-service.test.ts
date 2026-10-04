@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,11 +27,16 @@ function config(root:string): AppConfig { return {
 class FakeRepo {
   item!: Preview;
   activeCount = 0;
+  failMarkReady = false;
   async countActiveOwned() { return this.activeCount; }
   async sumReadyExtractedBytesOwned() { return this.item?.status === 'READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
   async sumReadyExtractedBytesTotal() { return this.item?.status === 'READY' ? this.item.extractedSizeBytes ?? 0 : 0; }
   async create(input:any) { const now=new Date(); this.item={...input, displayName:input.displayName??null,status:'CREATING',createdAt:now,updatedAt:now,compressedSizeBytes:null,extractedSizeBytes:null,fileCount:null,sourceSha256:null,lastErrorCode:null}; this.activeCount += 1; return this.item; }
-  async markReady(id:string, m:any) { this.item={...this.item,status:'READY',...m,updatedAt:new Date()}; return this.item; }
+  async markReady(id:string, m:any) {
+    if (this.failMarkReady) throw new Error('DATABASE_WRITE_FAILED');
+    this.item={...this.item,status:'READY',...m,updatedAt:new Date()};
+    return this.item;
+  }
   async markFailed(_id:string, code:string) { this.item={...this.item,status:'FAILED',lastErrorCode:code}; }
 }
 
@@ -43,6 +48,20 @@ describe('PreviewService', () => {
     const preview=await service.createFromFile({ownerUserId:'11111111-1111-1111-1111-111111111111',archivePath:archive,lifetimeMinutes:10});
     expect(preview.status).toBe('READY'); expect(preview.hostname).toBe(`${preview.id}.previewapp.apphome.one`); expect(preview.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await readFile(path.join(root,'data','previews',preview.id,'current','index.html'),'utf8')).toContain('Hello');
+    await rm(root,{recursive:true,force:true});
+  });
+
+  it('rolls back published files when READY metadata cannot be persisted', async () => {
+    const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-service-'));
+    const archive=path.join(root,'site.zip'); await zip(archive);
+    const store=new LocalVolumeObjectStore(path.join(root,'data')); await store.initialize();
+    const repo=new FakeRepo(); repo.failMarkReady=true;
+    const service=new PreviewService(config(path.join(root,'data')), repo as unknown as PreviewRepository, store);
+
+    await expect(service.createFromFile({ownerUserId:'owner-a',archivePath:archive})).rejects.toThrow('DATABASE_WRITE_FAILED');
+
+    expect(repo.item.status).toBe('FAILED');
+    await expect(access(path.join(root,'data','previews',repo.item.id,'current'))).rejects.toThrow();
     await rm(root,{recursive:true,force:true});
   });
 
