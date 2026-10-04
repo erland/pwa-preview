@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 import type { AppConfig } from '../config.js';
 import { isPreviewId } from './preview-id.js';
+import { ApplicationError } from '../errors/application-error.js';
 
 export const previewIdSchema = z.string().refine(isPreviewId, { message: 'INVALID_PREVIEW_ID' });
 
@@ -36,4 +37,10 @@ export function extendInputSchema(config: Pick<AppConfig, 'ttlMinMinutes' | 'ttl
     previewId: previewIdSchema,
     lifetimeMinutes: lifetimeMinutesSchema(config),
   });
+}
+
+export function normalizePreviewName(value: string): string {
+  const parsed = previewNameSchema.safeParse(value);
+  if (!parsed.success) throw new ApplicationError('INVALID_PREVIEW_NAME');
+  return parsed.data;
 }
