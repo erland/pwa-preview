@@ -34,6 +34,7 @@ services:
       STALE_STAGING_MINUTES: ${STALE_STAGING_MINUTES:-60}
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.pwa-preview-wildcard.rule=HostRegexp(`[a-z0-9-]+\\.${PREVIEW_DOMAIN_SUFFIX}`)"
       - "traefik.http.routers.pwa-preview-wildcard.entrypoints=https"
       - "traefik.http.routers.pwa-preview-wildcard.tls=true"
