@@ -9,6 +9,7 @@ import { previewStorageKey, type StagingKey } from '../storage/storage-key.js';
 import { createPreviewId } from './preview-id.js';
 import { PreviewPublisher } from './preview-publisher.js';
 import { UrlArtifactSource } from '../artifact/url-artifact-source.js';
+import { ApplicationError } from '../errors/application-error.js';
 
 const importCounts = new Map<string, number>();
 const createLocks = new Map<string, Promise<void>>();
@@ -16,7 +17,7 @@ let storageQuotaTail: Promise<void> = Promise.resolve();
 
 async function withImportPermit<T>(userId: string, limit: number, work: () => Promise<T>): Promise<T> {
   const active = importCounts.get(userId) ?? 0;
-  if (active >= limit) throw new Error('IMPORT_CONCURRENCY_LIMIT');
+  if (active >= limit) throw new ApplicationError('IMPORT_CONCURRENCY_LIMIT');
   importCounts.set(userId, active + 1);
   try {
     return await work();
@@ -108,7 +109,7 @@ export class PreviewService {
 
   private async createFromArtifact(input: { ownerUserId: string; archivePath: string; lifetimeMinutes?: number; displayName?: string | null; sourceType: 'UPLOAD' | 'URL' }): Promise<Preview> {
     const lifetime = input.lifetimeMinutes ?? this.config.ttlDefaultMinutes;
-    if (!Number.isInteger(lifetime) || lifetime < this.config.ttlMinMinutes || lifetime > this.config.ttlMaxMinutes) throw new Error('INVALID_TTL');
+    if (!Number.isInteger(lifetime) || lifetime < this.config.ttlMinMinutes || lifetime > this.config.ttlMaxMinutes) throw new ApplicationError('INVALID_TTL');
     const id = createPreviewId();
     const hostname = `${id}.${this.config.previewDomainSuffix}`;
     const expiresAt = new Date(Date.now() + lifetime * 60_000);
@@ -131,7 +132,7 @@ export class PreviewService {
             fileCount: imported.artifact.fileCount,
             sourceSha256: digest,
           });
-          if (!ready) throw new Error('PREVIEW_STATE_CHANGED');
+          if (!ready) throw new ApplicationError('PREVIEW_STATE_CHANGED');
           await replacement.commit();
           return ready;
         } catch (error) {
@@ -215,7 +216,7 @@ export class PreviewService {
 
   private async assertActivePreviewCapacity(ownerUserId: string): Promise<void> {
     const count = await this.repository.countActiveOwned(ownerUserId);
-    if (count >= this.config.maxActivePreviewsPerUser) throw new Error('ACTIVE_PREVIEW_LIMIT');
+    if (count >= this.config.maxActivePreviewsPerUser) throw new ApplicationError('ACTIVE_PREVIEW_LIMIT');
   }
 
   private async assertStorageCapacity(ownerUserId: string, incomingBytes: number, replacedBytes: number): Promise<void> {
@@ -225,8 +226,8 @@ export class PreviewService {
       this.repository.sumReadyExtractedBytesOwned(ownerUserId),
       this.repository.sumReadyExtractedBytesTotal(),
     ]);
-    if (ownedBytes + delta > this.config.maxStorageBytesPerUser) throw new Error('USER_STORAGE_QUOTA_LIMIT');
-    if (totalBytes + delta > this.config.maxStorageBytesTotal) throw new Error('TOTAL_STORAGE_QUOTA_LIMIT');
+    if (ownedBytes + delta > this.config.maxStorageBytesPerUser) throw new ApplicationError('USER_STORAGE_QUOTA_LIMIT');
+    if (totalBytes + delta > this.config.maxStorageBytesTotal) throw new ApplicationError('TOTAL_STORAGE_QUOTA_LIMIT');
   }
 
   async listOwned(ownerUserId: string): Promise<Preview[]> {
@@ -241,12 +242,12 @@ export class PreviewService {
 
   async extendOwned(ownerUserId: string, previewId: string, lifetimeMinutes: number): Promise<Preview | null> {
     if (!Number.isInteger(lifetimeMinutes) || lifetimeMinutes < this.config.ttlMinMinutes || lifetimeMinutes > this.config.ttlMaxMinutes) {
-      throw new Error('INVALID_TTL');
+      throw new ApplicationError('INVALID_TTL');
     }
     const current = await this.repository.findOwnedById(ownerUserId, previewId);
     if (!current || ['DELETED','DELETING','EXPIRED'].includes(current.status)) return null;
     const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
-    if (expiresAt <= current.expiresAt) throw new Error('INVALID_EXTENSION');
+    if (expiresAt <= current.expiresAt) throw new ApplicationError('INVALID_EXTENSION');
     return this.repository.extendOwned(ownerUserId, previewId, expiresAt);
   }
 

@@ -13,7 +13,13 @@ import type { PreviewService } from './preview-service.js';
 import { resolvePreviewIdFromHost } from './preview-host-resolver.js';
 import { classifyRequestPlane } from '../http-host-policy.js';
 import { servePreview } from './static-site-handler.js';
+import { isApplicationError } from '../errors/application-error.js';
 
+
+function errorCode(error: unknown, fallback: string): string {
+  if (isApplicationError(error)) return error.code;
+  return error instanceof Error ? error.message : fallback;
+}
 
 function multipartFieldValue(fields: Record<string, unknown>, name: string): string | undefined {
   const raw = fields[name] as any;
@@ -102,7 +108,7 @@ export async function registerPreviewHttp(
         await rm(dir, { recursive: true, force: true });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'PREVIEW_UPDATE_FAILED';
+      const message = errorCode(error, 'PREVIEW_UPDATE_FAILED');
       request.log.warn({ err: message }, 'preview update failed');
       const status = ['IMPORT_CONCURRENCY_LIMIT','USER_STORAGE_QUOTA_LIMIT','TOTAL_STORAGE_QUOTA_LIMIT'].includes(message) ? 429 : message.startsWith('SOURCE_URL_') ? 400 : 422;
       return reply.code(status).send({ error: message });
@@ -118,7 +124,7 @@ export async function registerPreviewHttp(
       if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
       return previewResponse(preview);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'PREVIEW_EXTEND_FAILED';
+      const message = errorCode(error, 'PREVIEW_EXTEND_FAILED');
       return reply.code(message === 'INVALID_TTL' || message === 'INVALID_EXTENSION' ? 400 : 422).send({ error: message });
     }
   });
@@ -144,7 +150,7 @@ export async function registerPreviewHttp(
         return reply.code(201).send({ previewId: preview.id, url: `https://${preview.hostname}`, createdAt: preview.createdAt.toISOString(), expiresAt: preview.expiresAt.toISOString(), status: preview.status });
       } catch (error) {
         request.log.warn({ err: error instanceof Error ? error.message : 'url import failed' }, 'preview URL creation failed');
-        const message = error instanceof Error ? error.message : 'PREVIEW_CREATE_FAILED';
+        const message = errorCode(error, 'PREVIEW_CREATE_FAILED');
         const status = ['ACTIVE_PREVIEW_LIMIT','IMPORT_CONCURRENCY_LIMIT','USER_STORAGE_QUOTA_LIMIT','TOTAL_STORAGE_QUOTA_LIMIT'].includes(message) ? 429 : message === 'INVALID_TTL' || message.startsWith('SOURCE_URL_') ? 400 : 422;
         return reply.code(status).send({ error: message });
       }
@@ -174,7 +180,7 @@ export async function registerPreviewHttp(
       });
     } catch (error) {
       request.log.warn({ err: error }, 'preview creation failed');
-      const message = error instanceof Error ? error.message : 'PREVIEW_CREATE_FAILED';
+      const message = errorCode(error, 'PREVIEW_CREATE_FAILED');
       const status = ['ACTIVE_PREVIEW_LIMIT','IMPORT_CONCURRENCY_LIMIT','USER_STORAGE_QUOTA_LIMIT','TOTAL_STORAGE_QUOTA_LIMIT'].includes(message) ? 429 : message === 'INVALID_TTL' ? 400 : 422;
       return reply.code(status).send({ error: message });
     } finally {
