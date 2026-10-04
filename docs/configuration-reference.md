@@ -17,6 +17,20 @@
 
 `CONTROL_PLANE_HOST` must belong to `CONTROL_PLANE_REGISTRABLE_DOMAIN`. `PREVIEW_DOMAIN_SUFFIX` is rejected at startup if it is the same domain or a subdomain of that registrable control-plane domain. This keeps arbitrary preview JavaScript outside the control-plane cookie/site boundary.
 
+## GitHub allowlist bootstrap
+
+- `PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS`: optional comma-separated list of verified GitHub email addresses.
+
+When present and non-empty, the list is synchronized to GitHub-scoped allowlist entries during startup. Listed addresses are enabled; existing GitHub-scoped entries that are not listed are disabled. Provider-neutral entries are left unchanged. Addresses are normalized case-insensitively.
+
+When the variable is missing or empty, startup performs no allowlist synchronization.
+
+Example:
+
+```text
+PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS=user@example.com,second@example.com
+```
+
 ## Listener
 
 - `PORT` defaults to `3000`.
