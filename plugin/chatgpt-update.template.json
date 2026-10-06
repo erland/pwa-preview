@@ -1,0 +1,18 @@
+{
+  "apps": "./.app.json",
+  "author": {
+    "name": "App developer"
+  },
+  "description": "Deploy and manage temporary previews of pre-built static web applications and PWAs.\n\nUse this app when a built frontend artifact is available via an HTTPS URL and needs to be published for review or testing.\n\nIt can:\n- create a temporary preview from a ZIP or tar.gz artifact URL\n- list existing previews\n- inspect a preview\n- update an existing preview while keeping its URL\n- extend a preview's lifetime\n- delete a preview\n\nThis service does not build source code. Build the application elsewhere first, then provide the resulting static artifact URL.",
+  "interface": {
+    "capabilities": [],
+    "category": "Other",
+    "defaultPrompt": null,
+    "developerName": "App developer",
+    "displayName": "PWA Preview",
+    "longDescription": "Deploy and manage temporary previews of pre-built static web applications and PWAs.\n\nUse this app when a built frontend artifact is available via an HTTPS URL and needs to be published for review or testing.\n\nIt can:\n- create a temporary preview from a ZIP or tar.gz artifact URL\n- list existing previews\n- inspect a preview\n- update an existing preview while keeping its URL\n- extend a preview's lifetime\n- delete a preview\n\nThis service does not build source code. Build the application elsewhere first, then provide the resulting static artifact URL.",
+    "shortDescription": "Deploy and manage temporary previews of pre-built static web applications and PWAs.\n\nUse this app when a built frontend artifact is available via an HTTPS URL and needs to be published for review or testing.\n\nIt can:\n- create a temporary preview from a ZIP or tar.gz artifact URL\n- list existing previews\n- inspect a preview\n- update an existing preview while keeping its URL\n- extend a preview's lifetime\n- delete a preview\n\nThis service does not build source code. Build the application elsewhere first, then provide the resulting static artifact URL."
+  },
+  "name": "__CHATGPT_PLUGIN_NAME__",
+  "version": "__PLUGIN_VERSION__"
+}
