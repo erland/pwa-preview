@@ -30,6 +30,10 @@ describe('MCP server', () => {
     const reply = await rpc(handler, { jsonrpc:'2.0', id:1, method:'tools/list', params:{} });
     const names = reply.result.tools.map((t:any)=>t.name);
     expect(names).toEqual(expect.arrayContaining(['preview_create','preview_list','preview_get','preview_update','preview_extend','preview_delete']));
+    const byName = Object.fromEntries(reply.result.tools.map((t:any)=>[t.name,t]));
+    expect(byName.preview_list.annotations).toMatchObject({ readOnlyHint:true, destructiveHint:false });
+    expect(byName.preview_create.annotations).toMatchObject({ readOnlyHint:false, openWorldHint:true, destructiveHint:false });
+    expect(byName.preview_delete.annotations).toMatchObject({ readOnlyHint:false, destructiveHint:true });
   });
 
   it('derives owner from authenticated MCP identity', async () => {
