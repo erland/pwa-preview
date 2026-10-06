@@ -18,7 +18,73 @@
           "Publish this built static web app as a temporary preview.",
           "Update my existing preview with the latest build.",
           "Show me my active PWA previews."
-        ]
+        ],
+        "capabilities": [
+          "Interactive"
+        ],
+        "websiteURL": "https://pwa-preview.apphome.one/about",
+        "supportURL": "https://pwa-preview.apphome.one/support",
+        "privacyPolicyURL": "https://pwa-preview.apphome.one/privacy",
+        "termsOfServiceURL": "https://pwa-preview.apphome.one/terms",
+        "logo": "assets/logo.png",
+        "composerIcon": "assets/composer-icon.png"
+      },
+      "review": {
+        "commerce": false,
+        "test_cases": {
+          "positive": [
+            {
+              "description": "List previews owned by the authenticated user.",
+              "prompt": "Show me my active PWA Preview deployments.",
+              "tools_triggered": "preview_list",
+              "expected_behavior": "Calls preview_list and reports only previews returned for the authenticated user."
+            },
+            {
+              "description": "Inspect one owned preview by ID.",
+              "prompt": "Show details for preview p-1234567890abcdef.",
+              "tools_triggered": "preview_get",
+              "expected_behavior": "Calls preview_get for the requested preview ID and reports the returned state without inventing fields."
+            },
+            {
+              "description": "Create a temporary preview from an HTTPS static artifact.",
+              "prompt": "Create a temporary preview from this static app artifact URL and give me the preview URL.",
+              "tools_triggered": "preview_create",
+              "expected_behavior": "Calls preview_create only with the user-provided HTTPS artifact URL, then returns the created preview URL and expiry."
+            },
+            {
+              "description": "Update an existing preview while preserving its preview URL.",
+              "prompt": "Update preview p-1234567890abcdef from this new static artifact URL.",
+              "tools_triggered": "preview_update",
+              "expected_behavior": "Calls preview_update for the existing preview ID and reports the updated preview while preserving the service-returned URL."
+            },
+            {
+              "description": "Delete an owned preview when the user explicitly asks.",
+              "prompt": "Delete preview p-1234567890abcdef.",
+              "tools_triggered": "preview_delete",
+              "expected_behavior": "Calls preview_delete only for the requested preview and reports whether deletion succeeded."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Do not use PWA Preview to build source code.",
+              "prompt": "Build this React source repository for me."
+            },
+            {
+              "description": "Do not use PWA Preview to deploy an application backend.",
+              "prompt": "Deploy this Node API server and database."
+            },
+            {
+              "description": "Do not operate on a preview without an owned preview ID or explicit target.",
+              "prompt": "Delete someone else's preview."
+            }
+          ]
+        }
+      },
+      "publication": {
+        "countries": [
+          "SE"
+        ],
+        "release_notes": "Initial Marketplace package with complete MCP configuration, workflow skill, public support/privacy/terms pages, review cases, and plugin icons."
       }
     }
   }
