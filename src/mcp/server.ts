@@ -21,6 +21,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     const server = new McpServer({ name: 'pwa-preview', version: '0.1.0' });
 
     server.registerTool('preview_create', {
+      annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
       description: 'Create a temporary preview from an HTTPS URL pointing to a ZIP or tar.gz static artifact.',
       inputSchema: createUrlInputSchema(config),
     }, async ({ sourceUrl, lifetimeMinutes, name }) => {
@@ -34,11 +35,13 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_list', {
+      annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
       description: 'List previews owned by the authenticated user.',
       inputSchema: z.object({}),
     }, async () => result({ previews: (await service.listOwned(userId)).map(toPreviewOutput) }));
 
     server.registerTool('preview_get', {
+      annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
       description: 'Get one preview owned by the authenticated user.',
       inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {
@@ -48,6 +51,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_update', {
+      annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
       description: 'Replace the content of an owned preview from an HTTPS artifact URL while keeping the same preview URL.',
       inputSchema: updateUrlInputSchema(),
     }, async ({ previewId, sourceUrl }) => {
@@ -57,6 +61,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_extend', {
+      annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false },
       description: 'Extend the lifetime of an owned preview.',
       inputSchema: extendInputSchema(config),
     }, async ({ previewId, lifetimeMinutes }) => {
@@ -66,6 +71,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_delete', {
+      annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: true },
       description: 'Delete an owned preview.',
       inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {
