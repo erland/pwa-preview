@@ -40,13 +40,13 @@ describe('MCP server', () => {
       description:expect.stringContaining('temporary HTTPS previews'),
       websiteUrl:'https://pwa-preview.apphome.one/about',
     });
-    expect(reply.result.serverInfo.version).toMatch(/\\S+/);
+    expect(reply.result.serverInfo.version).toMatch(/\S+/);
     expect(reply.result.serverInfo.icons).toHaveLength(1);
     expect(reply.result.serverInfo.icons[0]).toMatchObject({
       mimeType:'image/png',
       sizes:['64x64'],
     });
-    expect(reply.result.serverInfo.icons[0].src).toMatch(/^data:image\\/png;base64,/);
+    expect(reply.result.serverInfo.icons[0].src).toMatch(/^data:image\/png;base64,/);
   });
 
   it('exposes all lifecycle tools', async () => {
