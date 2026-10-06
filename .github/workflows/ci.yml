@@ -82,18 +82,30 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       PWA_PREVIEW_MCP_URL: https://pwa-preview.example.test/mcp
+      PWA_PREVIEW_CHATGPT_APP_ID: asdk_app_pwapreview_ci
+      PWA_PREVIEW_CHATGPT_PLUGIN_NAME: dev-pwapreview-ci
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - name: Build portable OpenAI plugin
-        run: npm run plugin:build -- --version 0.0.0-ci
-      - name: Validate generated package
+      - name: Build ChatGPT update package
+        run: npm run plugin:build -- --version 0.0.0-ci --target chatgpt
+      - name: Validate ChatGPT update package
         run: |
-          test -f build/plugin/pwa-preview/plugin.json
-          test -f build/plugin/pwa-preview/mcp.json
-          test -f build/plugin/pwa-preview/skills/pwa-preview/SKILL.md
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin/pwa-preview/plugin.json')); if(p.name!=='pwa-preview'||p.version!=='0.0.0-ci') process.exit(1)"
-          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('build/plugin/pwa-preview/mcp.json')); if(m.mcpServers['pwa-preview'].url!=='https://pwa-preview.example.test/mcp') process.exit(1)"
+          test -f build/plugin-chatgpt/.app.json
+          test -f build/plugin-chatgpt/.codex-plugin/plugin.json
+          test ! -e build/plugin-chatgpt/pwa-preview
+          test ! -e build/plugin-chatgpt/mcp.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin-chatgpt/.codex-plugin/plugin.json')); if(p.name!=='dev-pwapreview-ci'||p.version!=='0.0.0-ci'||p.apps!=='./.app.json') process.exit(1)"
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('build/plugin-chatgpt/.app.json')); if(a.apps['dev-pwapreview-ci'].id!=='asdk_app_pwapreview_ci') process.exit(1)"
+      - name: Build desktop MCP package
+        run: npm run plugin:build -- --version 0.0.0-ci --target desktop
+      - name: Validate desktop MCP package
+        run: |
+          test -f build/plugin-desktop/pwa-preview/plugin.json
+          test -f build/plugin-desktop/pwa-preview/mcp.json
+          test -f build/plugin-desktop/pwa-preview/skills/pwa-preview/SKILL.md
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('build/plugin-desktop/pwa-preview/plugin.json')); if(p.name!=='pwa-preview'||p.version!=='0.0.0-ci') process.exit(1)"
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('build/plugin-desktop/pwa-preview/mcp.json')); if(m.mcpServers['pwa-preview'].url!=='https://pwa-preview.example.test/mcp') process.exit(1)"

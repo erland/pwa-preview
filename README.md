@@ -140,11 +140,14 @@ The remote MCP endpoint is `POST /mcp` (Streamable HTTP). Interactive MCP client
 Tools: `preview_create`, `preview_list`, `preview_get`, `preview_update`, `preview_extend`, `preview_delete`. MCP create/update use HTTPS `sourceUrl`; tools never accept `ownerUserId`.
 
 
-### OpenAI plugin package
+### OpenAI plugin packages
 
-GitHub Releases also publish a portable OpenAI/Agent Plugins package named `pwa-preview-plugin-<version>.zip`. It declares the production Streamable HTTP MCP endpoint and includes workflow guidance for using PWA Preview directly from ChatGPT/Codex, including the Agent Workspace artifact handoff and stable-URL update flow.
+GitHub Releases publish two plugin artifacts:
 
-The package is generated from templates in `plugin/`. The public MCP URL is configurable with the GitHub Actions variable `PWA_PREVIEW_MCP_URL` and defaults to `https://pwa-preview.apphome.one/mcp`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package format, build command, release behavior, and configuration.
+- `pwa-preview-plugin-<version>.zip` — a ChatGPT update package for the already registered PWA Preview app. It contains `.app.json` and `.codex-plugin/plugin.json` directly at the ZIP root and is intended to be uploaded as a new version of the existing ChatGPT app.
+- `pwa-preview-plugin-desktop-<version>.zip` — the portable Agent Plugins/direct-MCP package with `plugin.json`, `mcp.json`, and the PWA Preview skill under a `pwa-preview/` top-level directory.
+
+The release build uses the GitHub Actions variables `PWA_PREVIEW_CHATGPT_APP_ID` (required), optional `PWA_PREVIEW_CHATGPT_PLUGIN_NAME`, and `PWA_PREVIEW_MCP_URL`. See [`docs/openai-plugin-distribution.md`](docs/openai-plugin-distribution.md) for the package formats, build commands, release behavior, and configuration.
 
 
 

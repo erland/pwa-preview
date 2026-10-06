@@ -56,29 +56,44 @@ jobs:
       contents: write
     env:
       PWA_PREVIEW_MCP_URL: ${{ vars.PWA_PREVIEW_MCP_URL || 'https://pwa-preview.apphome.one/mcp' }}
+      PWA_PREVIEW_CHATGPT_APP_ID: ${{ vars.PWA_PREVIEW_CHATGPT_APP_ID }}
+      PWA_PREVIEW_CHATGPT_PLUGIN_NAME: ${{ vars.PWA_PREVIEW_CHATGPT_PLUGIN_NAME }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - name: Build portable OpenAI plugin
+      - name: Build ChatGPT update and desktop plugin packages
         id: plugin
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          npm run plugin:build -- --version "$VERSION"
-          cd build/plugin
-          zip -qr "../pwa-preview-plugin-${VERSION}.zip" pwa-preview
+          if [[ -z "${PWA_PREVIEW_CHATGPT_APP_ID}" ]]; then
+            echo "Repository variable PWA_PREVIEW_CHATGPT_APP_ID must contain the registered ChatGPT app id before release." >&2
+            exit 1
+          fi
+          npm run plugin:build -- --version "$VERSION" --target chatgpt
+          npm run plugin:build -- --version "$VERSION" --target desktop
+          mkdir -p build
+          (cd build/plugin-chatgpt && zip -qr "../pwa-preview-plugin-${VERSION}.zip" .app.json .codex-plugin)
+          (cd build/plugin-desktop && zip -qr "../pwa-preview-plugin-desktop-${VERSION}.zip" pwa-preview)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "archive=build/pwa-preview-plugin-${VERSION}.zip" >> "$GITHUB_OUTPUT"
-      - name: Inspect plugin archive
+          echo "desktop_archive=build/pwa-preview-plugin-desktop-${VERSION}.zip" >> "$GITHUB_OUTPUT"
+      - name: Inspect plugin archives
         run: |
           unzip -l "${{ steps.plugin.outputs.archive }}"
-          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
-          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
-      - name: Attach plugin ZIP to GitHub Release
+          unzip -p "${{ steps.plugin.outputs.archive }}" .codex-plugin/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const p=JSON.parse(s);if(p.version!=='${{ steps.plugin.outputs.version }}'||!p.name.startsWith('dev-')||p.apps!=='./.app.json')process.exit(1)})"
+          unzip -p "${{ steps.plugin.outputs.archive }}" .app.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const a=JSON.parse(s);const names=Object.keys(a.apps||{});if(names.length!==1||a.apps[names[0]].id!=='${PWA_PREVIEW_CHATGPT_APP_ID}')process.exit(1)})"
+          if unzip -l "${{ steps.plugin.outputs.archive }}" | grep -Eq '(^|[[:space:]])pwa-preview/|mcp.json'; then
+            echo "ChatGPT update package must have no extra top directory and no mcp.json" >&2
+            exit 1
+          fi
+          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" pwa-preview/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" pwa-preview/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
+      - name: Attach plugin ZIPs to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" "${{ steps.plugin.outputs.desktop_archive }}" --clobber
