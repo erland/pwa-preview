@@ -16,11 +16,28 @@ function result(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
 }
 
+const PWA_PREVIEW_DESCRIPTION =
+  'Deploys and manages temporary HTTPS previews of pre-built static web applications and PWAs.';
+const PWA_PREVIEW_WEBSITE = 'https://pwa-preview.apphome.one/about';
+const PWA_PREVIEW_ICON_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACG0lEQVR42u2bsU7DMBRFbxEDewekzGVJP4KFAakDO2v+Ab6h/ENXdgakDix8BF1grsTA3q0M6JXEtds8O/V7cXyW1mms+F5fPzeDR9vtFkPmTHoA0pxzbi4r9CYuqwVGbe4btVkCfRJucsyIgwb0WbiJywhnDUhJPODWYzUgNfGETdeeAamKJ0x9g98GGwakPvtEXWdOAH0ZyuwTpDcnQHoA0rDeBd6e/j6Lx9vdtfV8ieLj4r893eDu837Xfrl6Dhwin5uH9veyE1AXD6AhHkBDvK2tjcEvgWwAt8N6vmy2p5tG21zzEjWAA6sIElwTNMMyoBifahhy5BogPQBpsgHSA5AmugFlFfuJhxFJQFnpMUJ0CWgwQbwGSKdB3ABCygg1BhCxTVBnABA3DV4vQ6dmtYj3LHUJiCkeUJSA2MIJcQOkhBOiS0BaPCCUAK7w8WS2d+3n67WTsUQ3gCPeJtz8LdQIdbsAcUi8z30uVBrgirxrtkNMUGeArxjffqoMCI2zT3+WARre34/BHSN7Fygr2f3brAOhqfHaBiWSMJ7MOtv764j/FeYQOts2VBVBCVQZcHkdFnGf/qoMAPxN8O2nzgCALyYkOSoNANqLCl02qncBEvf9vl/9Q4UTqg0guhJrY7cE2p6xSQXSq7YGxKJhwFBSUNeZE2BeSD0Fpj5rAlI1wabLuQRSM8GlJ58c5Zwe75MRnZ4dTplfR+OTt6Lc/vgAAAAASUVORK5CYII=';
+
 export function createMcpHttpHandler(service: PreviewService, userId: string, config: AppConfig) {
   return createMcpHandler(() => {
-    const server = new McpServer({ name: 'pwa-preview', version: '0.1.0' });
+    const server = new McpServer({
+      name: 'pwa-preview',
+      title: 'PWA Preview',
+      version: process.env.PWA_PREVIEW_VERSION ?? process.env.npm_package_version ?? '0.1.0',
+      description: PWA_PREVIEW_DESCRIPTION,
+      websiteUrl: PWA_PREVIEW_WEBSITE,
+      icons: [{
+        src: PWA_PREVIEW_ICON_DATA_URI,
+        mimeType: 'image/png',
+        sizes: ['64x64'],
+      }],
+    });
 
     server.registerTool('preview_create', {
+      annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
       description: 'Create a temporary preview from an HTTPS URL pointing to a ZIP or tar.gz static artifact.',
       inputSchema: createUrlInputSchema(config),
     }, async ({ sourceUrl, lifetimeMinutes, name }) => {
@@ -34,11 +51,13 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_list', {
+      annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
       description: 'List previews owned by the authenticated user.',
       inputSchema: z.object({}),
     }, async () => result({ previews: (await service.listOwned(userId)).map(toPreviewOutput) }));
 
     server.registerTool('preview_get', {
+      annotations: { readOnlyHint: true, openWorldHint: false, destructiveHint: false },
       description: 'Get one preview owned by the authenticated user.',
       inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {
@@ -48,6 +67,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_update', {
+      annotations: { readOnlyHint: false, openWorldHint: true, destructiveHint: false },
       description: 'Replace the content of an owned preview from an HTTPS artifact URL while keeping the same preview URL.',
       inputSchema: updateUrlInputSchema(),
     }, async ({ previewId, sourceUrl }) => {
@@ -57,6 +77,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_extend', {
+      annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false },
       description: 'Extend the lifetime of an owned preview.',
       inputSchema: extendInputSchema(config),
     }, async ({ previewId, lifetimeMinutes }) => {
@@ -66,6 +87,7 @@ export function createMcpHttpHandler(service: PreviewService, userId: string, co
     });
 
     server.registerTool('preview_delete', {
+      annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: true },
       description: 'Delete an owned preview.',
       inputSchema: z.object({ previewId: previewIdSchema }),
     }, async ({ previewId }) => {

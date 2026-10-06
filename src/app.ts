@@ -7,6 +7,7 @@ import { registerAuth } from './auth/auth-plugin.js';
 import type { GithubClient } from './auth/github-client.js';
 import { registerPreviewHttp } from './preview/preview-http-plugin.js';
 import { registerUi } from './ui/ui-plugin.js';
+import { registerPublicInfo } from './ui/public-info.js';
 import { registerMcp } from './mcp/server.js';
 import { registerMcpOAuth } from './mcp/oauth-server.js';
 import { classifyRequestPlane } from './http-host-policy.js';
@@ -62,6 +63,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       await registerPreviewHttp(scope, config, previewService, previewRepository, previewStore);
       await registerMcpOAuth(scope, config, pool);
       await registerMcp(scope, config, pool, previewService);
+      await registerPublicInfo(scope);
       await registerUi(scope);
     });
   }
