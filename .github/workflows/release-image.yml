@@ -56,44 +56,36 @@ jobs:
       contents: write
     env:
       PWA_PREVIEW_MCP_URL: ${{ vars.PWA_PREVIEW_MCP_URL || 'https://pwa-preview.apphome.one/mcp' }}
-      PWA_PREVIEW_CHATGPT_APP_ID: ${{ vars.PWA_PREVIEW_CHATGPT_APP_ID }}
-      PWA_PREVIEW_CHATGPT_PLUGIN_NAME: ${{ vars.PWA_PREVIEW_CHATGPT_PLUGIN_NAME }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - name: Build ChatGPT update and desktop plugin packages
+      - name: Build Marketplace plugin package
         id: plugin
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          if [[ -z "${PWA_PREVIEW_CHATGPT_APP_ID}" ]]; then
-            echo "Repository variable PWA_PREVIEW_CHATGPT_APP_ID must contain the registered ChatGPT app id before release." >&2
-            exit 1
-          fi
-          npm run plugin:build -- --version "$VERSION" --target chatgpt
-          npm run plugin:build -- --version "$VERSION" --target desktop
+          npm run plugin:build -- --version "$VERSION" --target marketplace
           mkdir -p build
-          (cd build/plugin-chatgpt && zip -qr "../pwa-preview-plugin-${VERSION}.zip" .app.json .codex-plugin)
-          (cd build/plugin-desktop && zip -qr "../pwa-preview-plugin-desktop-${VERSION}.zip" pwa-preview)
+          (cd build/plugin-marketplace && zip -qr "../pwa-preview-plugin-${VERSION}.zip" pwa-preview)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "archive=build/pwa-preview-plugin-${VERSION}.zip" >> "$GITHUB_OUTPUT"
-          echo "desktop_archive=build/pwa-preview-plugin-desktop-${VERSION}.zip" >> "$GITHUB_OUTPUT"
-      - name: Inspect plugin archives
+      - name: Inspect Marketplace plugin archive
         run: |
           unzip -l "${{ steps.plugin.outputs.archive }}"
-          unzip -p "${{ steps.plugin.outputs.archive }}" .codex-plugin/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const p=JSON.parse(s);if(p.version!=='${{ steps.plugin.outputs.version }}'||!p.name.startsWith('dev-')||p.apps!=='./.app.json')process.exit(1)})"
-          unzip -p "${{ steps.plugin.outputs.archive }}" .app.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const a=JSON.parse(s);const names=Object.keys(a.apps||{});if(names.length!==1||a.apps[names[0]].id!=='${PWA_PREVIEW_CHATGPT_APP_ID}')process.exit(1)})"
-          if unzip -l "${{ steps.plugin.outputs.archive }}" | grep -Eq '(^|[[:space:]])pwa-preview/|mcp.json'; then
-            echo "ChatGPT update package must have no extra top directory and no mcp.json" >&2
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const p=JSON.parse(s);if(p.name!=='pwa-preview'||p.version!=='${{ steps.plugin.outputs.version }}'||p.apps!=null||p.extensions?.['com.openai']?.apps!=null)process.exit(1)})"
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{const m=JSON.parse(s);if(m.mcpServers?.['pwa-preview']?.url!=='${PWA_PREVIEW_MCP_URL}')process.exit(1)})"
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/skills/pwa-preview/SKILL.md >/dev/null
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/assets/logo.png >/dev/null
+          unzip -p "${{ steps.plugin.outputs.archive }}" pwa-preview/assets/composer-icon.png >/dev/null
+          if unzip -l "${{ steps.plugin.outputs.archive }}" | grep -Eq '\.app\.json|\.codex-plugin/'; then
+            echo "Marketplace upload must not contain app bindings or compatibility update manifests." >&2
             exit 1
           fi
-          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" pwa-preview/plugin.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
-          unzip -p "${{ steps.plugin.outputs.desktop_archive }}" pwa-preview/mcp.json | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>JSON.parse(s))"
-      - name: Attach plugin ZIPs to GitHub Release
+      - name: Attach plugin ZIP to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" "${{ steps.plugin.outputs.desktop_archive }}" --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.plugin.outputs.archive }}" --clobber
