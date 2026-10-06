@@ -25,6 +25,30 @@ async function rpc(handler: ReturnType<typeof createMcpHttpHandler>, body: unkno
 }
 
 describe('MCP server', () => {
+  it('advertises server metadata during initialize', async () => {
+    const handler = createMcpHttpHandler(fakeService(), 'user-a', config);
+    const reply = await rpc(handler, {
+      jsonrpc:'2.0',
+      id:'init',
+      method:'initialize',
+      params:{ protocolVersion:'2025-11-25', capabilities:{}, clientInfo:{ name:'test-client', version:'1.0.0' } },
+    });
+
+    expect(reply.result.serverInfo).toMatchObject({
+      name:'pwa-preview',
+      title:'PWA Preview',
+      description:expect.stringContaining('temporary HTTPS previews'),
+      websiteUrl:'https://pwa-preview.apphome.one/about',
+    });
+    expect(reply.result.serverInfo.version).toMatch(/\\S+/);
+    expect(reply.result.serverInfo.icons).toHaveLength(1);
+    expect(reply.result.serverInfo.icons[0]).toMatchObject({
+      mimeType:'image/png',
+      sizes:['64x64'],
+    });
+    expect(reply.result.serverInfo.icons[0].src).toMatch(/^data:image\\/png;base64,/);
+  });
+
   it('exposes all lifecycle tools', async () => {
     const handler = createMcpHttpHandler(fakeService(), 'user-a', config);
     const reply = await rpc(handler, { jsonrpc:'2.0', id:1, method:'tools/list', params:{} });
