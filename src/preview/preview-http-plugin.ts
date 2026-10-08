@@ -90,6 +90,7 @@ export async function registerPreviewHttp(
       return toPreviewOutput(preview);
     } catch (error) {
       if ((error as {code?:string}).code === '23505') return reply.code(409).send({ error: 'PUBLICATION_SLUG_TAKEN' });
+      if ((error as {message?:string}).message === 'PERMANENT_PREVIEW_LIMIT') return reply.code(409).send({ error: 'PERMANENT_PREVIEW_LIMIT' });
       throw error;
     }
   });
