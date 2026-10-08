@@ -13,7 +13,7 @@ function preview(overrides: Partial<Preview> = {}): Preview {
     id: 'p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', ownerUserId: 'owner-a', displayName: null, status: 'READY',
     hostname: 'p-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.previewapp.apphome.one', createdAt: now, updatedAt: now,
     expiresAt: new Date(now.getTime() + 10 * 60_000), compressedSizeBytes: 10, extractedSizeBytes: 20, fileCount: 1,
-    sourceSha256: 'a'.repeat(64), sourceType: 'UPLOAD', lastErrorCode: null, ...overrides,
+    sourceSha256: 'a'.repeat(64), sourceType: 'UPLOAD', lastErrorCode: null, publicationMode:'TEMPORARY', slug:null, ...overrides,
   };
 }
 
@@ -50,7 +50,7 @@ describe('PreviewService lifecycle', () => {
   it('extends only forward and within configured TTL', async () => {
     const root=await mkdtemp(path.join(os.tmpdir(),'pwa-preview-life-')); const store=new LocalVolumeObjectStore(root); await store.initialize();
     const repo=new RepoStub(); repo.value=preview({expiresAt:new Date(Date.now()+6*60_000)}); const service=new PreviewService(config, repo as any, store);
-    const result=await service.extendOwned('owner-a',repo.value.id,30); expect(result!.expiresAt.getTime()).toBeGreaterThan(Date.now()+20*60_000);
+    const result=await service.extendOwned('owner-a',repo.value.id,30); expect(result!.expiresAt!.getTime()).toBeGreaterThan(Date.now()+20*60_000);
     await expect(service.extendOwned('owner-a',repo.value.id,1)).rejects.toThrow('INVALID_TTL');
   });
 
