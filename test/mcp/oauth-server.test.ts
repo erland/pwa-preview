@@ -84,4 +84,45 @@ describe('MCP OAuth authorization server', () => {
     await app.close();
   });
 
+  it('returns a stable successor during concurrent refresh retries and rejects the wrong client', async () => {
+    const { createHash } = await import('node:crypto');
+    const secret = 'pwr_test-original-secret';
+    const digest = createHash('sha256').update(secret).digest('hex');
+    let rotatedAt: number | null = null;
+    const db = {
+      query: async (sql: string, args: unknown[] = []) => {
+        if (sql.includes('UPDATE oauth_refresh_tokens')) {
+          if (args[0] !== digest || args[1] !== 'client-1' ||
+              (args[2] != null && args[2] !== 'https://pwa-preview.example.com/mcp') ||
+              (rotatedAt !== null && Date.now() - rotatedAt > 30_000)) {
+            return { rows: [], rowCount: 0 };
+          }
+          rotatedAt ??= Date.now();
+          return { rows: [{ token_hash: digest, client_id: 'client-1',
+            user_id: '00000000-0000-4000-8000-000000000001', scope: 'mcp',
+            resource: 'https://pwa-preview.example.com/mcp',
+            expires_at: new Date(Date.now() + 60_000) }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 1 };
+      },
+    } as any;
+    const app = Fastify();
+    await registerMcpOAuth(app, { ...config, sessionSecret: 'secure-test-session-secret-of-sufficient-length' }, db);
+    const refresh = (client_id = 'client-1') => app.inject({
+      method: 'POST', url: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: new URLSearchParams({
+        grant_type: 'refresh_token', refresh_token: secret, client_id,
+      }).toString(),
+    });
+    const [a, b] = await Promise.all([refresh(), refresh()]);
+    expect(a.statusCode).toBe(200);
+    expect(b.statusCode).toBe(200);
+    expect(a.json().refresh_token).toBe(b.json().refresh_token);
+    expect((await refresh('different-client')).json().error).toBe('invalid_grant');
+    rotatedAt = Date.now() - 31_000;
+    expect((await refresh()).json().error).toBe('invalid_grant');
+    await app.close();
+  });
+
 });
