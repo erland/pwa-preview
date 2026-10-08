@@ -20,7 +20,7 @@ function safePath(root:string, requestPath:string): string | null {
 
 export async function servePreview(req: FastifyRequest, reply: FastifyReply, previewId:string, repository:PreviewRepository, store:LocalPreviewStorage): Promise<void> {
   const preview = await repository.findReadyById(previewId);
-  if (!preview || preview.expiresAt <= new Date()) { await reply.code(404).send({error:'PREVIEW_NOT_FOUND'}); return; }
+  if (!preview || (preview.expiresAt !== null && preview.expiresAt <= new Date())) { await reply.code(404).send({error:'PREVIEW_NOT_FOUND'}); return; }
   const root = store.getPreviewSiteRoot(previewStorageKey(previewId));
   let target = safePath(root, req.url);
   if (!target) { await reply.code(404).send(); return; }
