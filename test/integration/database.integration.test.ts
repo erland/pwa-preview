@@ -89,7 +89,7 @@ integration('PostgreSQL persistence', () => {
     expect(await previews.extendOwned(other.id, id, new Date(Date.now()+1_200_000))).toBeNull();
     expect(await previews.markDeletingOwned(other.id, id)).toBeNull();
     expect((await previews.findOwnedById(owner.id,id))?.status).toBe('READY');
-    expect((await previews.findOwnedById(owner.id,id))?.expiresAt.getTime()).toBe(created.expiresAt.getTime());
+    expect((await previews.findOwnedById(owner.id,id))?.expiresAt?.getTime()).toBe(created.expiresAt?.getTime());
   });
 
   test('preview lifecycle transitions require the expected source state', async () => {
