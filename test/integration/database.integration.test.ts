@@ -142,6 +142,26 @@ integration('PostgreSQL persistence', () => {
     expect((await repository.claimExpired(100)).some(x=>x.id===id)).toBe(false);
   });
 
+  test('simultaneous promotions cannot exceed the permanent quota', async () => {
+    const user = await new UserRepository(pool).create();
+    const repository = new PreviewRepository(pool);
+    const prefix = 'p-quota';
+    for (let index = 0; index < 11; index++) {
+      const id = prefix + String(index).padStart(16, '0');
+      await repository.create({
+        id, ownerUserId: user.id, hostname: id + '.preview.example',
+        expiresAt: new Date(Date.now() + 600000), sourceType: 'UPLOAD', status: 'READY',
+      });
+    }
+    const results = await Promise.allSettled(Array.from({length:11}, (_, index) =>
+      repository.promoteOwned(user.id, prefix + String(index).padStart(16,'0'), 'quota-' + index)
+    ));
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value !== null);
+    expect(successful).toHaveLength(10);
+    const count = await pool.query("SELECT count(*)::int AS count FROM previews WHERE owner_user_id=$1 AND publication_mode='PERMANENT'", [user.id]);
+    expect(count.rows[0]?.count).toBe(10);
+  });
+
   test('stale creating reconciliation claims only rows still creating', async () => {
     const users = new UserRepository(pool);
     const previews = new PreviewRepository(pool);
