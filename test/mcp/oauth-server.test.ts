@@ -62,4 +62,26 @@ describe('MCP OAuth authorization server', () => {
     expect(insertValues?.[1]).toContain('connector_platform_oauth_redirect');
     await app.close();
   });
+  it('logs rejected refresh attempts without token contents', async () => {
+    const logs: string[] = [];
+    const app = Fastify({ logger: {
+      level: 'info',
+      stream: { write: (chunk: string) => { logs.push(chunk); } },
+    } });
+    await registerMcpOAuth(app, config, {
+      query: async () => ({ rows: [], rowCount: 0 }),
+    } as any);
+    const response = await app.inject({
+      method: 'POST', url: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'grant_type=refresh_token&client_id=test-client&refresh_token=do-not-log-this',
+    });
+    expect(response.statusCode).toBe(400);
+    const events = logs.map(line => JSON.parse(line)).filter(event => event.event === 'oauth.refresh');
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: 'rejected', reason: 'invalid_grant' });
+    expect(logs.join('')).not.toContain('do-not-log-this');
+    await app.close();
+  });
+
 });
