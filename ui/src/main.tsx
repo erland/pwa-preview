@@ -172,7 +172,7 @@ function App() {
   }
 
   async function remove(preview: Preview) {
-    if (!confirm(`Radera ${preview.name || preview.previewId}?`)) return;
+    if (!confirm('Radera ' + (preview.name || preview.previewId) + (preview.slug ? ' och permanent URL ' + preview.url : '') + '?')) return;
     setBusy(preview.previewId); setError(null);
     try { await api(`/api/previews/${preview.previewId}`, { method: 'DELETE' }); await refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte radera preview'); }
