@@ -23,7 +23,7 @@ function config(root:string): AppConfig { return {
   maxStorageBytesPerUser:2147483648, maxStorageBytesTotal:21474836480,
   cleanupIntervalMs:60000, reconciliationIntervalMs:600000, staleOperationMinutes:30, staleStagingMinutes:60, migrateOnStart:true,
 }; }
-function ready(ownerUserId='owner'): Preview { const now=new Date(); return { id:'p-0123456789abcdef0123456789abcdef', ownerUserId, displayName:null, status:'READY', hostname:'p-0123456789abcdef0123456789abcdef.previewapp.apphome.one', createdAt:now, updatedAt:now, expiresAt:new Date(now.getTime()+600000), compressedSizeBytes:1, extractedSizeBytes:1, fileCount:1, sourceSha256:'0'.repeat(64), sourceType:'UPLOAD', lastErrorCode:null }; }
+function ready(ownerUserId='owner'): Preview { const now=new Date(); return { id:'p-0123456789abcdef0123456789abcdef', ownerUserId, displayName:null, status:'READY', hostname:'p-0123456789abcdef0123456789abcdef.previewapp.apphome.one', createdAt:now, updatedAt:now, expiresAt:new Date(now.getTime()+600000), compressedSizeBytes:1, extractedSizeBytes:1, fileCount:1, sourceSha256:'0'.repeat(64), sourceType:'UPLOAD', lastErrorCode:null, publicationMode:'TEMPORARY', slug:null }; }
 class UpdateRepo {
   item: Preview;
   failMetadata=false;

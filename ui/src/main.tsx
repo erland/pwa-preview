@@ -9,7 +9,9 @@ type Preview = {
   status: string;
   createdAt: string;
   updatedAt: string;
-  expiresAt: string;
+  expiresAt: string | null;
+  publicationMode: 'TEMPORARY' | 'PERMANENT';
+  slug: string | null;
   compressedSizeBytes: number | null;
   extractedSizeBytes: number | null;
   fileCount: number | null;
@@ -147,6 +149,16 @@ function App() {
     finally { setBusy(null); }
   }
 
+  async function promote(preview: Preview) {
+    const slug = window.prompt('Adressnamn för permanent publicering:', 'min-prototyp');
+    if (slug === null) return;
+    setBusy(preview.previewId);
+    try {
+      await api('/api/previews/' + preview.previewId + '/promote', {method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({slug})});
+      await refresh();
+    } catch(e) { setError(e instanceof Error ? e.message : 'Publiceringen misslyckades'); }
+    finally { setBusy(null); }
+  }
   async function extend(preview: Preview) {
     if (!capabilities) return;
     const minutes = Number(prompt('Ny livslängd från nu, i minuter:', String(capabilities.preview.ttlMinutes.default)));
@@ -160,7 +172,7 @@ function App() {
   }
 
   async function remove(preview: Preview) {
-    if (!confirm(`Radera ${preview.name || preview.previewId}?`)) return;
+    if (!confirm('Radera ' + (preview.name || preview.previewId) + (preview.slug ? ' och permanent URL ' + preview.url : '') + '?')) return;
     setBusy(preview.previewId); setError(null);
     try { await api(`/api/previews/${preview.previewId}`, { method: 'DELETE' }); await refresh(); }
     catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte radera preview'); }
@@ -232,8 +244,8 @@ function App() {
         {sorted.length === 0 ? <div className="empty"><strong>Inga previews ännu</strong><p>Skapa din första preview ovan.</p></div> : <div className="cards">{sorted.map(preview => (
           <article className="preview-card" key={preview.previewId}>
             <div className="preview-main"><div className="preview-title"><span className={`status ${preview.status.toLowerCase()}`}>{preview.status}</span><h3>{preview.name || 'Namnlös preview'}</h3><code>{preview.previewId}</code></div><a className="open-link" href={preview.url} target="_blank" rel="noreferrer">Öppna ↗</a></div>
-            <div className="meta-grid"><div><span>Utgår</span><strong>{formatDate(preview.expiresAt)}</strong></div><div><span>Källa</span><strong>{preview.sourceType}</strong></div><div><span>Storlek</span><strong>{formatBytes(preview.extractedSizeBytes)}</strong></div><div><span>Filer</span><strong>{preview.fileCount ?? '–'}</strong></div></div>
-            <div className="card-actions"><a className="button ghost" href={`/api/previews/${preview.previewId}/download`} aria-disabled={preview.status !== 'READY'} onClick={e=>{if(preview.status!=='READY')e.preventDefault();}}>Ladda ned ZIP</a><label className="button ghost upload-button">Uppdatera<input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>{void update(preview,e.target.files?.[0] ?? null); e.currentTarget.value='';}} disabled={busy===preview.previewId} /></label><button className="button ghost" onClick={()=>extend(preview)} disabled={busy===preview.previewId}>Förläng</button><button className="button danger" onClick={()=>remove(preview)} disabled={busy===preview.previewId}>Radera</button></div>
+            <div className="meta-grid"><div><span>Utgår</span><strong>{preview.expiresAt ? formatDate(preview.expiresAt) : 'Permanent'}</strong></div><div><span>Källa</span><strong>{preview.sourceType}</strong></div><div><span>Storlek</span><strong>{formatBytes(preview.extractedSizeBytes)}</strong></div><div><span>Filer</span><strong>{preview.fileCount ?? '–'}</strong></div></div>
+            <div className="card-actions"><a className="button ghost" href={`/api/previews/${preview.previewId}/download`} aria-disabled={preview.status !== 'READY'} onClick={e=>{if(preview.status!=='READY')e.preventDefault();}}>Ladda ned ZIP</a><label className="button ghost upload-button">Uppdatera<input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>{void update(preview,e.target.files?.[0] ?? null); e.currentTarget.value='';}} disabled={busy===preview.previewId} /></label>{preview.publicationMode === "TEMPORARY" && <><button className="button ghost" onClick={()=>promote(preview)} disabled={busy===preview.previewId || preview.status !== "READY"}>Behåll permanent</button><button className="button ghost" onClick={()=>extend(preview)} disabled={busy===preview.previewId}>Förläng</button></>}<button className="button danger" onClick={()=>remove(preview)} disabled={busy===preview.previewId}>Radera</button></div>
           </article>
         ))}</div>}
       </section>

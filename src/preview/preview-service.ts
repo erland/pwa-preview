@@ -249,7 +249,7 @@ export class PreviewService {
     const current = await this.repository.findOwnedById(ownerUserId, previewId);
     if (!current || ['DELETED','DELETING','EXPIRED'].includes(current.status)) return null;
     const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
-    if (expiresAt <= current.expiresAt) throw new ApplicationError('INVALID_EXTENSION');
+    if (!current.expiresAt || expiresAt <= current.expiresAt) throw new ApplicationError('INVALID_EXTENSION');
     return this.repository.extendOwned(ownerUserId, previewId, expiresAt);
   }
 

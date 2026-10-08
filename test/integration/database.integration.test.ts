@@ -89,7 +89,7 @@ integration('PostgreSQL persistence', () => {
     expect(await previews.extendOwned(other.id, id, new Date(Date.now()+1_200_000))).toBeNull();
     expect(await previews.markDeletingOwned(other.id, id)).toBeNull();
     expect((await previews.findOwnedById(owner.id,id))?.status).toBe('READY');
-    expect((await previews.findOwnedById(owner.id,id))?.expiresAt.getTime()).toBe(created.expiresAt.getTime());
+    expect((await previews.findOwnedById(owner.id,id))?.expiresAt?.getTime()).toBe(created.expiresAt?.getTime());
   });
 
   test('preview lifecycle transitions require the expected source state', async () => {
@@ -129,6 +129,37 @@ integration('PostgreSQL persistence', () => {
     });
     expect(await previews.markFailedFromCreating(readyId, 'LATE_FAILURE')).toBe(false);
     expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
+  });
+
+  test('permanent preview survives expiration', async () => {
+    const owner = await new UserRepository(pool).create();
+    const repository = new PreviewRepository(pool);
+    const id = 'p-' + 'f'.repeat(32);
+    await repository.create({id, ownerUserId:owner.id, hostname:id+'.preview.example', expiresAt:new Date(Date.now()+600000), sourceType:'UPLOAD', status:'READY'});
+    const p = await repository.promoteOwned(owner.id,id,'example-test');
+    expect(p?.publicationMode).toBe('PERMANENT');
+    expect((await repository.findReadyBySlug('example-test'))?.id).toBe(id);
+    expect((await repository.claimExpired(100)).some(x=>x.id===id)).toBe(false);
+  });
+
+  test('simultaneous promotions cannot exceed the permanent quota', async () => {
+    const user = await new UserRepository(pool).create();
+    const repository = new PreviewRepository(pool);
+    const prefix = 'p-quota';
+    for (let index = 0; index < 11; index++) {
+      const id = prefix + String(index).padStart(16, '0');
+      await repository.create({
+        id, ownerUserId: user.id, hostname: id + '.preview.example',
+        expiresAt: new Date(Date.now() + 600000), sourceType: 'UPLOAD', status: 'READY',
+      });
+    }
+    const results = await Promise.allSettled(Array.from({length:11}, (_, index) =>
+      repository.promoteOwned(user.id, prefix + String(index).padStart(16,'0'), 'quota-' + index)
+    ));
+    const successful = results.filter(result => result.status === 'fulfilled' && result.value !== null);
+    expect(successful).toHaveLength(10);
+    const count = await pool.query("SELECT count(*)::int AS count FROM previews WHERE owner_user_id=$1 AND publication_mode='PERMANENT'", [user.id]);
+    expect(count.rows[0]?.count).toBe(10);
   });
 
   test('stale creating reconciliation claims only rows still creating', async () => {

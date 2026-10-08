@@ -18,7 +18,7 @@ describe('toPreviewOutput', () => {
       fileCount: 2,
       sourceSha256: 'b'.repeat(64),
       sourceType: 'UPLOAD',
-      lastErrorCode: null,
+      lastErrorCode: null, publicationMode:'TEMPORARY', slug:null,
     };
 
     expect(toPreviewOutput(preview)).toEqual({
@@ -34,6 +34,7 @@ describe('toPreviewOutput', () => {
       fileCount: 2,
       sourceSha256: 'b'.repeat(64),
       sourceType: 'UPLOAD',
+      publicationMode:'TEMPORARY', slug:null,
     });
   });
 });

@@ -57,6 +57,21 @@ export class PreviewRepository {
     return result.rows.map(mapPreview);
   }
 
+  async findReadyBySlug(slug: string): Promise<Preview | null> {
+    const result = await this.pool.query("SELECT * FROM previews WHERE slug=$1 AND publication_mode='PERMANENT' AND status='READY'", [slug]);
+    return result.rows[0] ? mapPreview(result.rows[0]) : null;
+  }
+
+  async promoteOwned(ownerUserId: string, id: string, slug: string): Promise<Preview | null> {
+    const result = await this.pool.query(`
+      UPDATE previews SET publication_mode='PERMANENT', slug=$3, expires_at=NULL, updated_at=now()
+      WHERE id=$1 AND owner_user_id=$2 AND status='READY' AND publication_mode='TEMPORARY'
+        AND expires_at > now()
+        AND (SELECT count(*) FROM previews WHERE owner_user_id=$2 AND publication_mode='PERMANENT' AND status='READY') < 10
+      RETURNING *`, [id, ownerUserId, slug]);
+    return result.rows[0] ? mapPreview(result.rows[0]) : null;
+  }
+
   async findReadyById(id: string): Promise<Preview | null> {
     const result = await this.pool.query("SELECT * FROM previews WHERE id = $1 AND status = 'READY'", [id]);
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
@@ -113,7 +128,7 @@ export class PreviewRepository {
   async claimExpired(limit: number): Promise<Preview[]> {
     const result = await this.pool.query(
       `UPDATE previews SET status='EXPIRED', updated_at=now()
-       WHERE id IN (SELECT id FROM previews WHERE expires_at <= now() AND status='READY' ORDER BY expires_at LIMIT $1 FOR UPDATE SKIP LOCKED)
+       WHERE id IN (SELECT id FROM previews WHERE publication_mode='TEMPORARY' AND expires_at <= now() AND status='READY' ORDER BY expires_at LIMIT $1 FOR UPDATE SKIP LOCKED)
        RETURNING *`, [limit],
     );
     return result.rows.map(mapPreview);
@@ -172,7 +187,7 @@ export class PreviewRepository {
   async extendOwned(ownerUserId: string, id: string, expiresAt: Date): Promise<Preview | null> {
     const result = await this.pool.query(
       `UPDATE previews SET expires_at=$3, updated_at=now()
-       WHERE id=$1 AND owner_user_id=$2 AND status NOT IN ('DELETED','DELETING','EXPIRED')
+       WHERE id=$1 AND owner_user_id=$2 AND publication_mode='TEMPORARY' AND status NOT IN ('DELETED','DELETING','EXPIRED')
        RETURNING *`,
       [id, ownerUserId, expiresAt],
     );
@@ -185,7 +200,7 @@ function mapPreview(row: Record<string, unknown>): Preview {
   return {
     id: String(row.id), ownerUserId: String(row.owner_user_id), displayName: row.display_name === null ? null : String(row.display_name),
     status: row.status as PreviewStatus, hostname: String(row.hostname), createdAt: new Date(String(row.created_at)),
-    updatedAt: new Date(String(row.updated_at)), expiresAt: new Date(String(row.expires_at)),
+    updatedAt: new Date(String(row.updated_at)), expiresAt: row.expires_at === null ? null : new Date(String(row.expires_at)), publicationMode: (row.publication_mode ?? 'TEMPORARY') as Preview['publicationMode'], slug: row.slug == null ? null : String(row.slug),
     compressedSizeBytes: numberOrNull(row.compressed_size_bytes), extractedSizeBytes: numberOrNull(row.extracted_size_bytes),
     fileCount: numberOrNull(row.file_count), sourceSha256: row.source_sha256 === null ? null : String(row.source_sha256),
     sourceType: row.source_type as PreviewSourceType, lastErrorCode: row.last_error_code === null ? null : String(row.last_error_code),

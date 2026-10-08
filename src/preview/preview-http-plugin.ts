@@ -48,7 +48,7 @@ export async function registerPreviewHttp(
   app.addHook('onRequest', async (request, reply) => {
     const plane = classifyRequestPlane(request.headers.host, config.controlPlaneHost, config.previewDomainSuffix);
     if (plane !== 'PREVIEW') return;
-    const id = resolvePreviewIdFromHost(request.headers.host, config.previewDomainSuffix);
+    const id = await resolvePublishedId(request.headers.host);
     if (!id) { await reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' }); return; }
     await servePreview(request, reply, id, repository, store);
   });
@@ -62,6 +62,37 @@ export async function registerPreviewHttp(
       return;
     }
     return reply.code(404).send({ error: 'NOT_FOUND' });
+  });
+
+  async function resolvePublishedId(host: string | undefined): Promise<string | null> {
+    const id = resolvePreviewIdFromHost(host, config.previewDomainSuffix);
+    if (id) return id;
+    const normalized = host?.split(':', 1)[0]?.toLowerCase() ?? '';
+    const suffix = '.' + config.previewDomainSuffix.toLowerCase();
+    if (!normalized.endsWith(suffix)) return null;
+    const slug = normalized.slice(0, -suffix.length);
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) || slug.length < 3 || slug.length > 40) return null;
+    const found = await repository.findReadyBySlug(slug);
+    return found?.id ?? null;
+  }
+
+  app.post('/api/previews/:id/promote', { preHandler: requireAuth }, async (request, reply) => {
+    const id = (request.params as { id: string }).id;
+    if (!previewIdSchema.safeParse(id).success) return reply.code(400).send({ error: 'INVALID_PREVIEW_ID' });
+    const slug = String((request.body as { slug?: unknown } | undefined)?.slug ?? '').toLowerCase();
+    const reserved = new Set(['www','api','auth','mcp','admin','login','health','ready','support','static','assets']);
+    if (slug.length < 3 || slug.length > 40 || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) || reserved.has(slug) || /^p-[a-f0-9]{32}$/.test(slug)) {
+      return reply.code(400).send({ error: 'INVALID_PUBLICATION_SLUG' });
+    }
+    try {
+      const preview = await repository.promoteOwned(request.authContext!.userId, id, slug);
+      if (!preview) return reply.code(409).send({ error: 'PROMOTION_NOT_AVAILABLE' });
+      return toPreviewOutput(preview);
+    } catch (error) {
+      if ((error as {code?:string}).code === '23505') return reply.code(409).send({ error: 'PUBLICATION_SLUG_TAKEN' });
+      if ((error as {message?:string}).message === 'PERMANENT_PREVIEW_LIMIT') return reply.code(409).send({ error: 'PERMANENT_PREVIEW_LIMIT' });
+      throw error;
+    }
   });
 
   app.get('/api/previews', { preHandler: requireAuth }, async (request) => {
@@ -84,7 +115,7 @@ export async function registerPreviewHttp(
     const parsedId = previewIdSchema.safeParse(id);
     if (!parsedId.success) return reply.code(400).send({ error: validationError(parsedId) });
     const preview = await service.getOwned(request.authContext!.userId, parsedId.data);
-    if (!preview || preview.status !== 'READY' || preview.expiresAt <= new Date()) {
+    if (!preview || preview.status !== 'READY' || (preview.expiresAt && preview.expiresAt <= new Date())) {
       return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
     }
     try {
