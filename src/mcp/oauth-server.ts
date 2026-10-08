@@ -166,13 +166,39 @@ export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, 
     }
 
     if (grantType === 'refresh_token') {
+      const startedAt = Date.now();
+      const diagnostic = (outcome: 'success' | 'rejected' | 'error', reason: string) => {
+        app.log.info({
+          event: 'oauth.refresh',
+          request_id: request.id,
+          outcome,
+          reason,
+          duration_ms: Date.now() - startedAt,
+        }, 'MCP OAuth refresh');
+      };
       const refreshToken = form.refresh_token ?? '';
       const clientId = form.client_id ?? '';
-      if (!refreshToken || !clientId) return oauthError(reply, 'invalid_request', 'Missing refresh token parameters');
-      const record = await store.consumeRefreshToken(hash(refreshToken));
-      if (!record || record.clientId !== clientId) return oauthError(reply, 'invalid_grant', 'Refresh token is invalid or expired');
-      if (form.resource && form.resource !== record.resource) return oauthError(reply, 'invalid_target', 'Resource mismatch');
-      return issueOAuthTokens(reply, store, tokens, record.clientId, record.userId, record.scope, record.resource);
+      if (!refreshToken || !clientId) {
+        diagnostic('rejected', 'missing_parameters');
+        return oauthError(reply, 'invalid_request', 'Missing refresh token parameters');
+      }
+      try {
+        const record = await store.consumeRefreshToken(hash(refreshToken));
+        if (!record || record.clientId !== clientId) {
+          diagnostic('rejected', 'invalid_grant');
+          return oauthError(reply, 'invalid_grant', 'Refresh token is invalid or expired');
+        }
+        if (form.resource && form.resource !== record.resource) {
+          diagnostic('rejected', 'resource_mismatch');
+          return oauthError(reply, 'invalid_target', 'Resource mismatch');
+        }
+        const response = await issueOAuthTokens(reply, store, tokens, record.clientId, record.userId, record.scope, record.resource);
+        diagnostic('success', 'rotated');
+        return response;
+      } catch (error) {
+        diagnostic('error', 'internal_error');
+        throw error;
+      }
     }
 
     return oauthError(reply, 'unsupported_grant_type', 'Unsupported grant_type');
