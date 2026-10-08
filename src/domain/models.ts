@@ -38,7 +38,9 @@ export type Preview = Readonly<{
   hostname: string;
   createdAt: Date;
   updatedAt: Date;
-  expiresAt: Date;
+  expiresAt: Date | null;
+  publicationMode: 'TEMPORARY' | 'PERMANENT';
+  slug: string | null;
   compressedSizeBytes: number | null;
   extractedSizeBytes: number | null;
   fileCount: number | null;
