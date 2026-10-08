@@ -15,6 +15,8 @@ import { classifyRequestPlane } from '../http-host-policy.js';
 import { servePreview } from './static-site-handler.js';
 import { isApplicationError } from '../errors/application-error.js';
 import { toPreviewOutput } from './preview-output.js';
+import { exportPreviewZip } from './preview-zip-export.js';
+import { previewStorageKey } from '../storage/storage-key.js';
 import { createUrlInputSchema, extendInputSchema, lifetimeMinutesSchema, previewIdSchema, previewNameSchema, updateUrlInputSchema } from './preview-input.js';
 
 
@@ -74,6 +76,28 @@ export async function registerPreviewHttp(
     const preview = await service.getOwned(request.authContext!.userId, parsedId.data);
     if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
     return toPreviewOutput(preview);
+  });
+
+  // UI download; intentionally not exposed via MCP.
+  app.get('/api/previews/:id/download', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsedId = previewIdSchema.safeParse(id);
+    if (!parsedId.success) return reply.code(400).send({ error: validationError(parsedId) });
+    const preview = await service.getOwned(request.authContext!.userId, parsedId.data);
+    if (!preview || preview.status !== 'READY' || preview.expiresAt <= new Date()) {
+      return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
+    }
+    try {
+      const zip = await exportPreviewZip(store.getPreviewSiteRoot(previewStorageKey(parsedId.data)));
+      return reply
+        .header('Content-Type', 'application/zip')
+        .header('Content-Disposition', `attachment; filename="${parsedId.data}.zip"`)
+        .header('Cache-Control', 'private, no-store')
+        .send(zip.outputStream);
+    } catch (error) {
+      request.log.error({ err: error }, 'preview ZIP export failed');
+      return reply.code(500).send({ error: 'PREVIEW_EXPORT_FAILED' });
+    }
   });
 
   app.put('/api/previews/:id/content', { preHandler: requireAuth }, async (request, reply) => {
