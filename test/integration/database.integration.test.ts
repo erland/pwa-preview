@@ -131,6 +131,17 @@ integration('PostgreSQL persistence', () => {
     expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
   });
 
+  test('permanent preview survives expiration', async () => {
+    const owner = await new UserRepository(pool).create();
+    const repository = new PreviewRepository(pool);
+    const id = 'p-' + 'f'.repeat(32);
+    await repository.create({id, ownerUserId:owner.id, hostname:id+'.preview.example', expiresAt:new Date(Date.now()+600000), sourceType:'UPLOAD', status:'READY'});
+    const p = await repository.promoteOwned(owner.id,id,'example-test');
+    expect(p?.publicationMode).toBe('PERMANENT');
+    expect((await repository.findReadyBySlug('example-test'))?.id).toBe(id);
+    expect((await repository.claimExpired(100)).some(x=>x.id===id)).toBe(false);
+  });
+
   test('stale creating reconciliation claims only rows still creating', async () => {
     const users = new UserRepository(pool);
     const previews = new PreviewRepository(pool);
