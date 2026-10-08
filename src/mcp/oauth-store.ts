@@ -67,19 +67,22 @@ export class OAuthStore {
   async saveRefreshToken(token: RefreshToken): Promise<void> {
     await this.db.query(
       `INSERT INTO oauth_refresh_tokens(token_hash, client_id, user_id, scope, resource, expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
+       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (token_hash) DO NOTHING`,
       [token.tokenHash, token.clientId, token.userId, token.scope, token.resource, token.expiresAt],
     );
   }
 
-  async consumeRefreshToken(tokenHash: string): Promise<RefreshToken | null> {
+  async consumeRefreshToken(tokenHash: string, clientId: string, resource?: string): Promise<RefreshToken | null> {
     const result = await this.db.query<{
       token_hash:string; client_id:string; user_id:string; scope:string; resource:string; expires_at:Date|string;
     }>(
-      `DELETE FROM oauth_refresh_tokens
-       WHERE token_hash = $1 AND expires_at > now()
+      `UPDATE oauth_refresh_tokens
+       SET rotated_at = COALESCE(rotated_at, now())
+       WHERE token_hash = $1 AND client_id = $2 AND ($3::text IS NULL OR resource = $3)
+         AND expires_at > now()
+         AND (rotated_at IS NULL OR rotated_at >= now() - interval '30 seconds')
        RETURNING token_hash, client_id, user_id, scope, resource, expires_at`,
-      [tokenHash],
+      [tokenHash, clientId, resource ?? null],
     );
     const row = result.rows[0];
     return row ? {
