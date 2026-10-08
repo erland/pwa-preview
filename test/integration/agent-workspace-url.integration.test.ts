@@ -17,7 +17,7 @@ class MemoryPreviewRepository {
   private readonly rows = new Map<string, Preview>();
   async create(input: { id:string; ownerUserId:string; hostname:string; expiresAt:Date; sourceType:PreviewSourceType; displayName?:string|null; status?:PreviewStatus }): Promise<Preview> {
     const now = new Date();
-    const row: Preview = { id:input.id, ownerUserId:input.ownerUserId, displayName:input.displayName ?? null, status:input.status ?? 'CREATING', hostname:input.hostname, createdAt:now, updatedAt:now, expiresAt:input.expiresAt, compressedSizeBytes:null, extractedSizeBytes:null, fileCount:null, sourceSha256:null, sourceType:input.sourceType, lastErrorCode:null };
+    const row: Preview = { id:input.id, ownerUserId:input.ownerUserId, displayName:input.displayName ?? null, status:input.status ?? 'CREATING', hostname:input.hostname, createdAt:now, updatedAt:now, expiresAt:input.expiresAt, compressedSizeBytes:null, extractedSizeBytes:null, fileCount:null, sourceSha256:null, sourceType:input.sourceType, lastErrorCode:null, publicationMode:'TEMPORARY', slug:null };
     this.rows.set(row.id,row); return row;
   }
   async findOwnedById(owner:string,id:string){ const r=this.rows.get(id); return r?.ownerUserId===owner?r:null; }
