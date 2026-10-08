@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { DatabasePool } from '../persistence/db.js';
@@ -183,7 +183,7 @@ export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, 
         return oauthError(reply, 'invalid_request', 'Missing refresh token parameters');
       }
       try {
-        const record = await store.consumeRefreshToken(hash(refreshToken));
+        const record = await store.consumeRefreshToken(hash(refreshToken), clientId, form.resource);
         if (!record || record.clientId !== clientId) {
           diagnostic('rejected', 'invalid_grant');
           return oauthError(reply, 'invalid_grant', 'Refresh token is invalid or expired');
@@ -192,8 +192,8 @@ export async function registerMcpOAuth(app: FastifyInstance, config: AppConfig, 
           diagnostic('rejected', 'resource_mismatch');
           return oauthError(reply, 'invalid_target', 'Resource mismatch');
         }
-        const response = await issueOAuthTokens(reply, store, tokens, record.clientId, record.userId, record.scope, record.resource);
-        diagnostic('success', 'rotated');
+        const response = await issueOAuthTokens(reply, store, tokens, record.clientId, record.userId, record.scope, record.resource, refreshToken, config.sessionSecret);
+        diagnostic('success', 'rotated_or_retried');
         return response;
       } catch (error) {
         diagnostic('error', 'internal_error');
@@ -214,9 +214,13 @@ async function issueOAuthTokens(
   userId: string,
   scope: string,
   resource: string,
+  predecessor?: string,
+  signingSecret?: string,
 ) {
   const access = await tokens.issueForSeconds(userId, ACCESS_TOKEN_SECONDS);
-  const refreshToken = randomToken('pwr_');
+  const refreshToken = predecessor && signingSecret
+    ? 'pwr_' + createHmac('sha256', signingSecret).update('oauth-refresh-successor-v1:').update(predecessor).digest('base64url')
+    : randomToken('pwr_');
   await store.saveRefreshToken({
     tokenHash: hash(refreshToken),
     clientId,
