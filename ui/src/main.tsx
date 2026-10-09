@@ -250,6 +250,8 @@ function App() {
             </div>
           ))}
         </div>
+        {!me.identities.some(identity => identity.provider === 'github') &&
+          <a className="button ghost" href="/auth/login/github?link=true">Koppla GitHub-konto</a>}
         {googleEnabled && !me.identities.some(identity => identity.provider === 'google') &&
           <a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a>}
         {me.identities.length <= 1 && <p className="access-help">Du behöver minst en kopplad inloggningsmetod.</p>}
