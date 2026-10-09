@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { UserService } from '../../src/users/user-service.js';
-import { McpTokenService } from '../../src/mcp/token-service.js';
 
 import { createDatabasePool, runMigrations, type DatabasePool } from '../../src/persistence/db.js';
 import { UserRepository } from '../../src/persistence/repositories/user-repository.js';
