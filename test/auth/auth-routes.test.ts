@@ -56,6 +56,17 @@ describe('auth routes', () => {
     await app.close();
   });
 
+  it('keeps /api/me inaccessible without a session even when Google is enabled', async () => {
+    const app = buildApp({
+      config: { ...config, googleClientId: 'google-client', googleClientSecret: 'google-secret' },
+      pool: unusedPool,
+    });
+    const response = await app.inject({ method: 'GET', url: '/api/me', headers: { host: config.controlPlaneHost } });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: 'AUTHENTICATION_REQUIRED' });
+    await app.close();
+  });
+
   it('requires authentication for /api/me', async () => {
     const app = buildApp({ config, pool: unusedPool });
     const response = await app.inject({ method: 'GET', url: '/api/me', headers: { host: config.controlPlaneHost } });
