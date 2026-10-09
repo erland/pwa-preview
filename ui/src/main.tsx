@@ -19,6 +19,8 @@ type Preview = {
   sourceType: string;
 };
 
+type MergePreview = { provider: 'github' | 'google'; currentPreviews: number; otherPreviews: number; currentPermanent: number; otherPermanent: number };
+
 type Me = { userId: string; identities: { provider: string; email: string | null }[] };
 
 type RuntimeCapabilities = {
@@ -53,6 +55,7 @@ function formatBytes(value: number | null) {
 
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [merge, setMerge] = useState<MergePreview | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
   const [previews, setPreviews] = useState<Preview[]>([]);
@@ -90,6 +93,9 @@ function App() {
         return;
       }
       setMe(identity.value);
+      if (new URLSearchParams(window.location.search).get('merge') === 'review') {
+        api<MergePreview>('/api/account-merge').then(setMerge).catch(() => setError('Sammanslagningsförslaget är inte längre giltigt. Försök koppla kontot igen.'));
+      }
       return refresh();
     }).catch((e) => {
       setError(e instanceof Error ? e.message : 'Kunde inte läsa serverkonfiguration');
@@ -97,6 +103,21 @@ function App() {
       setMe(null);
     });
   }, []);
+
+  async function resolveMerge(confirmMerge: boolean) {
+    setBusy('merge'); setError(null);
+    try {
+      await api(confirmMerge ? '/api/account-merge/confirm' : '/api/account-merge/cancel', { method: 'POST' });
+      setMerge(null);
+      window.history.replaceState({}, '', '/');
+      if (confirmMerge) {
+        setMe(await api<Me>('/api/me'));
+        await refresh();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunde inte behandla sammanslagningen');
+    } finally { setBusy(null); }
+  }
 
   async function unlinkIdentity(provider: 'github' | 'google') {
     if (!me || me.identities.length <= 1) return;
@@ -233,6 +254,19 @@ function App() {
         <div className="header-actions"><button className="button ghost" onClick={refresh}>Uppdatera</button><form method="post" action="/auth/logout"><button className="button ghost">Logga ut</button></form></div>
       </header>
 
+      {merge && <section className="access-card" role="dialog" aria-modal="true" aria-labelledby="merge-heading">
+        <div className="section-heading"><div><p className="eyebrow">Kontokoppling</p><h2 id="merge-heading">Vill du slå samman dina konton?</h2></div></div>
+        <p className="access-help">Ditt {merge.provider === 'github' ? 'GitHub' : 'Google'}-konto är redan kopplat till ett annat PWA Preview-konto. Du har nu autentiserat båda kontona.</p>
+        <div className="merge-stats">
+          <div><strong>Nuvarande konto</strong><p>{merge.currentPreviews} aktiva prototyper, {merge.currentPermanent} permanenta</p></div>
+          <div><strong>Andra kontot</strong><p>{merge.otherPreviews} aktiva prototyper, {merge.otherPermanent} permanenta</p></div>
+        </div>
+        <p>Vid sammanslagning behålls dina publiceringar och båda inloggningsmetoderna. Det andra kontots sessioner och MCP-token upphör att gälla. Åtgärden kan inte ångras automatiskt.</p>
+        <div className="header-actions">
+          <button className="button ghost" disabled={busy === 'merge'} onClick={() => void resolveMerge(false)}>Avbryt</button>
+          <button className="button primary" disabled={busy === 'merge'} onClick={() => void resolveMerge(true)}>Slå samman konton</button>
+        </div>
+      </section>}
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
       <section className="access-card">
