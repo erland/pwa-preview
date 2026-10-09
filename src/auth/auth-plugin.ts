@@ -70,11 +70,14 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
   app.get('/api/auth/providers', async () => ({ github: true, google: Boolean(google) }));
 
   app.get('/auth/login/github', async (request, reply) => {
-    const query = request.query as { returnTo?: string };
+    const query = request.query as { returnTo?: string; link?: string };
     request.session.set('oauthReturnTo', query.returnTo?.startsWith('/authorize?') ? query.returnTo : '');
     const state = randomBytes(24).toString('base64url');
     request.session.set('oauthStateHash', stateHash(state));
     request.session.set('oauthProvider', 'github');
+    const linkUserId = query.link === 'true' ? request.authContext?.userId : undefined;
+    if (query.link === 'true' && !linkUserId) return reply.code(401).send({ error: 'AUTHENTICATION_REQUIRED' });
+    request.session.set('oauthLinkUserId', linkUserId ?? '');
     const callback = `https://${options.config.controlPlaneHost}/auth/callback/github`;
     const authorize = new URL('https://github.com/login/oauth/authorize');
     authorize.searchParams.set('client_id', options.config.githubClientId);
@@ -94,16 +97,20 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     const expected = Buffer.from(expectedHash);
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return reply.code(400).send({ error: 'INVALID_OAUTH_STATE' });
 
+    const linkUserId = request.session.get('oauthLinkUserId');
+    request.session.set('oauthLinkUserId', '');
+    if (linkUserId && request.authContext?.userId !== linkUserId) return reply.code(401).send({ error: 'LINK_SESSION_EXPIRED' });
     try {
       const token = await github.exchangeCode(query.code);
       const identity = await github.fetchIdentity(token);
-      const { userId } = await users.loginWithGithub(identity);
+      const { userId } = await users.loginWithProvider('github', identity, linkUserId || undefined);
       request.session.set('userId', userId);
       const returnTo = request.session.get('oauthReturnTo');
       request.session.set('oauthReturnTo', '');
       return reply.redirect(typeof returnTo === 'string' && returnTo.startsWith('/authorize?') ? returnTo : '/');
     } catch (error) {
       if (error instanceof AccessDeniedError) return reply.code(403).send({ error: error.message });
+      if (error instanceof Error && error.message === 'IDENTITY_ALREADY_LINKED') return reply.code(409).send({ error: error.message });
       request.log.warn({ err: error }, 'github oauth callback failed');
       return reply.code(401).send({ error: 'AUTHENTICATION_FAILED' });
     }
