@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { UserService } from '../../src/users/user-service.js';
+import { McpTokenService } from '../../src/mcp/token-service.js';
+
 import { createDatabasePool, runMigrations, type DatabasePool } from '../../src/persistence/db.js';
 import { UserRepository } from '../../src/persistence/repositories/user-repository.js';
 import { IdentityRepository } from '../../src/persistence/repositories/identity-repository.js';
@@ -182,6 +185,39 @@ integration('PostgreSQL persistence', () => {
     expect(claimed.map((p)=>p.id)).not.toContain(readyId);
     expect((await previews.findOwnedById(owner.id, staleId))?.status).toBe('FAILED');
     expect((await previews.findOwnedById(owner.id, readyId))?.status).toBe('READY');
+  });
+
+  test('account merge preserves previews, identities and revokes source MCP tokens', async () => {
+    const users = new UserRepository(pool), identities = new IdentityRepository(pool), previews = new PreviewRepository(pool);
+    const destination = await users.create(), source = await users.create();
+    const subject = 'merge-gh-' + source.id;
+    await identities.create({ userId: destination.id, provider: 'google', providerSubject: 'merge-google-' + destination.id, email: 'dest@example.test', emailVerified: true });
+    await identities.create({ userId: source.id, provider: 'github', providerSubject: subject, email: 'source@example.test', emailVerified: true });
+    const ids = ['p-merge' + destination.id.replaceAll('-', ''), 'p-merge' + source.id.replaceAll('-', '')];
+    for (const [index, owner] of [destination, source].entries()) {
+      await previews.create({ id: ids[index]!, ownerUserId: owner.id, hostname: ids[index]! + '.example.test',
+        expiresAt: new Date(Date.now() + 600_000), sourceType: 'UPLOAD', status: 'READY' });
+    }
+    const token = 'merge-test-token-' + source.id;
+    await pool.query(`INSERT INTO mcp_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 hour')`, [source.id, token]);
+    await new UserService(pool).mergeAccounts(destination.id, source.id, 'github', subject, { active: 20, permanent: 10, storage: 1_000_000 });
+    expect((await previews.listOwned(destination.id)).map(p => p.id)).toEqual(expect.arrayContaining(ids));
+    expect(await users.findById(source.id)).toBeNull();
+    expect((await identities.findByProviderSubject('github', subject))?.userId).toBe(destination.id);
+    expect((await pool.query('SELECT count(*)::int AS count FROM mcp_tokens WHERE token_hash=$1', [token])).rows[0]?.count).toBe(0);
+  });
+
+  test('account merge quota rollback preserves both accounts', async () => {
+    const users = new UserRepository(pool), identities = new IdentityRepository(pool), previews = new PreviewRepository(pool);
+    const destination = await users.create(), source = await users.create(), subject = 'merge-gh-' + source.id;
+    await identities.create({ userId: source.id, provider: 'github', providerSubject: subject, email: 'source@example.test', emailVerified: true });
+    const id = 'p-quota' + source.id.replaceAll('-', '');
+    await previews.create({ id, ownerUserId: source.id, hostname: id + '.example.test',
+      expiresAt: new Date(Date.now() + 600_000), sourceType: 'UPLOAD', status: 'READY' });
+    await expect(new UserService(pool).mergeAccounts(destination.id, source.id, 'github', subject,
+      { active: 0, permanent: 10, storage: 1000 })).rejects.toThrow('MERGE_LIMIT_EXCEEDED');
+    expect(await users.findById(source.id)).not.toBeNull();
+    expect((await previews.findOwnedById(source.id, id))?.id).toBe(id);
   });
 
 });
