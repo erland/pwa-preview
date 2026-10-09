@@ -135,6 +135,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     try {
       const token = await github.exchangeCode(query.code);
       const identity = await github.fetchIdentity(token);
+      if (linkUserId) await users.ensureIdentityAllowed('github', identity);
       const linked = linkUserId ? await identities.findByProviderSubject('github', identity.subject) : null;
       if (linkUserId && linked && linked.userId !== linkUserId) {
         await stageMerge(request, linkUserId, 'github', identity.subject);
@@ -195,6 +196,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     if (linkUserId && request.authContext?.userId !== linkUserId) return reply.code(401).send({ error: 'LINK_SESSION_EXPIRED' });
     try {
       const identity = await google.exchangeCode(query.code, 'https://' + options.config.controlPlaneHost + '/auth/callback/google', verifier);
+      if (linkUserId) await users.ensureIdentityAllowed('google', identity);
       const linked = linkUserId ? await identities.findByProviderSubject('google', identity.subject) : null;
       if (linkUserId && linked && linked.userId !== linkUserId) {
         await stageMerge(request, linkUserId, 'google', identity.subject);
