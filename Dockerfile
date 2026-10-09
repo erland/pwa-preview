@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim AS build
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY src ./src
 COPY ui ./ui
 RUN npm run build
 
-FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim AS runtime
+FROM public.ecr.aws/docker/library/node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package*.json ./
