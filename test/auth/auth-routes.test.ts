@@ -87,6 +87,18 @@ describe('auth routes', () => {
     await app.close();
   });
 
+  it('does not expose or confirm account merges without authentication', async () => {
+    const app = buildApp({ config, pool: unusedPool });
+    const headers = { host: config.controlPlaneHost, origin: 'https://' + config.controlPlaneHost };
+    const preview = await app.inject({ method: 'GET', url: '/api/account-merge', headers });
+    const confirm = await app.inject({ method: 'POST', url: '/api/account-merge/confirm', headers });
+    const cancel = await app.inject({ method: 'POST', url: '/api/account-merge/cancel', headers });
+    expect(preview.statusCode).toBe(401);
+    expect(confirm.statusCode).toBe(401);
+    expect(cancel.statusCode).toBe(401);
+    await app.close();
+  });
+
   it('requires authentication for /api/me', async () => {
     const app = buildApp({ config, pool: unusedPool });
     const response = await app.inject({ method: 'GET', url: '/api/me', headers: { host: config.controlPlaneHost } });
