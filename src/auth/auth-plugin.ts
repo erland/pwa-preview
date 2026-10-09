@@ -71,7 +71,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     request.session.set('mergeExpiresAt', Date.now() + 5 * 60_000);
     return true;
   };
-  const pendingMerge = (request: FastifyRequest) => {
+  const pendingMerge = (request: FastifyRequest): { destinationId: string; sourceId: string; provider: 'github' | 'google'; subject: string } | null => {
     const destinationId = request.session.get('mergeDestinationId');
     const sourceId = request.session.get('mergeSourceId');
     const provider = request.session.get('mergeProvider');
