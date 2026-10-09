@@ -25,6 +25,10 @@ export class UserService {
     return result.rows[0]?.allowed ?? false;
   }
 
+  async ensureIdentityAllowed(provider: 'github' | 'google', identity: LoginIdentity): Promise<void> {
+    if (!identity.emailVerified || !(await this.allowlist.isAllowed(identity.email, provider))) throw new AccessDeniedError();
+  }
+
   async getMergePreview(destinationId: string, sourceId: string): Promise<{ currentPreviews: number; otherPreviews: number; currentPermanent: number; otherPermanent: number } | null> {
     if (destinationId === sourceId) return null;
     const result = await this.pool.query<{ owner_user_id: string; total: string; permanent: string }>(
