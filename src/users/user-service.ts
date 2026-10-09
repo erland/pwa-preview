@@ -25,6 +25,39 @@ export class UserService {
     return result.rows[0]?.allowed ?? false;
   }
 
+  async unlinkProvider(userId: string, provider: 'github' | 'google'): Promise<'removed' | 'not_found' | 'last_identity'> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Serializing account changes prevents concurrent requests from removing both login methods.
+      const locked = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      if (locked.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return 'not_found';
+      }
+      const identities = await client.query<{ id: string; provider: string }>(
+        'SELECT id, provider FROM external_identities WHERE user_id = $1 FOR UPDATE', [userId],
+      );
+      const selected = identities.rows.filter((identity) => identity.provider === provider);
+      if (selected.length === 0) {
+        await client.query('ROLLBACK');
+        return 'not_found';
+      }
+      if (identities.rows.length <= selected.length) {
+        await client.query('ROLLBACK');
+        return 'last_identity';
+      }
+      await client.query('DELETE FROM external_identities WHERE user_id = $1 AND provider = $2', [userId, provider]);
+      await client.query('COMMIT');
+      return 'removed';
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async loginWithGithub(identity: GithubIdentity): Promise<{ userId: string }> { return this.loginWithProvider('github', identity); }
 
   async loginWithProvider(provider: 'github' | 'google', identity: LoginIdentity, linkUserId?: string): Promise<{ userId: string }> {

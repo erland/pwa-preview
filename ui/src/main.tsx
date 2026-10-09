@@ -19,7 +19,7 @@ type Preview = {
   sourceType: string;
 };
 
-type Me = { userId: string };
+type Me = { userId: string; identities: { provider: string; email: string | null }[] };
 
 type RuntimeCapabilities = {
   preview: {
@@ -97,6 +97,22 @@ function App() {
       setMe(null);
     });
   }, []);
+
+  async function unlinkIdentity(provider: 'github' | 'google') {
+    if (!me || me.identities.length <= 1) return;
+    const label = provider === 'github' ? 'GitHub' : 'Google';
+    if (!window.confirm('Vill du ta bort kopplingen till ' + label + '? Du kommer inte längre att kunna logga in med det kontot. Dina prototyper finns kvar.')) return;
+    setBusy('unlink-' + provider);
+    setError(null);
+    try {
+      await api('/api/me/identities/' + provider, { method: 'DELETE' });
+      setMe(await api<Me>('/api/me'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunde inte ta bort kontokopplingen');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function createMcpToken() {
     setBusy('mcp-token'); setError(null);
@@ -202,8 +218,10 @@ function App() {
         <p className="eyebrow">PWA Preview</p>
         <h1>Publicera en färdig PWA på några sekunder.</h1>
         <p>Logga in för att skapa, uppdatera och hantera dina publicerade prototyper.</p>
-        <a className="button primary wide" href="/auth/login/github">Fortsätt med GitHub</a>
-        {googleEnabled && <a className="button primary wide" href="/auth/login/google">Fortsätt med Google</a>}
+        <div className="login-actions">
+          <a className="button primary wide" href="/auth/login/github">Fortsätt med GitHub</a>
+          {googleEnabled && <a className="button primary wide" href="/auth/login/google">Fortsätt med Google</a>}
+        </div>
       </section>
     </main>
   );
@@ -217,7 +235,27 @@ function App() {
 
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
-      {googleEnabled && <section className="access-card"><div className="section-heading"><div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div><a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a></div><p className="access-help">Koppla Google till detta konto för att nå samma prototyper med båda inloggningssätten.</p></section>}
+      <section className="access-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div>
+        </div>
+        <div className="identity-list">
+          {me.identities.filter(identity => identity.provider === 'github' || identity.provider === 'google').map(identity => (
+            <div className="identity-item" key={identity.provider}>
+              <div><strong>{identity.provider === 'github' ? 'GitHub' : 'Google'} – kopplat</strong><p>{identity.email ?? 'Verifierat konto'}</p></div>
+              <button className="button ghost" type="button"
+                disabled={me.identities.length <= 1 || busy !== null}
+                title={me.identities.length <= 1 ? 'Den sista inloggningsmetoden kan inte tas bort' : 'Ta bort kontokopplingen'}
+                onClick={() => void unlinkIdentity(identity.provider as 'github' | 'google')}>Ta bort koppling</button>
+            </div>
+          ))}
+        </div>
+        {!me.identities.some(identity => identity.provider === 'github') &&
+          <a className="button ghost" href="/auth/login/github?link=true">Koppla GitHub-konto</a>}
+        {googleEnabled && !me.identities.some(identity => identity.provider === 'google') &&
+          <a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a>}
+        {me.identities.length <= 1 && <p className="access-help">Du behöver minst en kopplad inloggningsmetod.</p>}
+      </section>
       <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Integration</p><h2>MCP access</h2></div>
