@@ -67,6 +67,26 @@ describe('auth routes', () => {
     await app.close();
   });
 
+  it('requires authentication for removing linked providers', async () => {
+    const app = buildApp({ config, pool: unusedPool });
+    const response = await app.inject({
+      method: 'DELETE', url: '/api/me/identities/google',
+      headers: { host: config.controlPlaneHost, origin: 'https://' + config.controlPlaneHost },
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('requires an existing session to link GitHub', async () => {
+    const app = buildApp({ config, pool: unusedPool });
+    const response = await app.inject({
+      method: 'GET', url: '/auth/login/github?link=true',
+      headers: { host: config.controlPlaneHost },
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
   it('requires authentication for /api/me', async () => {
     const app = buildApp({ config, pool: unusedPool });
     const response = await app.inject({ method: 'GET', url: '/api/me', headers: { host: config.controlPlaneHost } });
