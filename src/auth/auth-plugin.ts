@@ -168,7 +168,14 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     return reply.code(204).send();
   });
 
-  app.get('/api/me', { preHandler: requireAuth }, async (request) => ({ userId: request.authContext!.userId }));
+  app.get('/api/me', { preHandler: requireAuth }, async (request) => {
+    const userId = request.authContext!.userId;
+    const result = await options.pool.query<{ provider: string; email: string | null }>(
+      'SELECT provider, email FROM external_identities WHERE user_id = $1 AND email_verified = true ORDER BY provider',
+      [userId],
+    );
+    return { userId, identities: result.rows.map(({ provider, email }) => ({ provider, email })) };
+  });
 }
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
