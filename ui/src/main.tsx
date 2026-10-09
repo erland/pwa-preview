@@ -19,7 +19,7 @@ type Preview = {
   sourceType: string;
 };
 
-type Me = { userId: string };
+type Me = { userId: string; identities: { provider: string; email: string | null }[] };
 
 type RuntimeCapabilities = {
   preview: {
@@ -202,8 +202,10 @@ function App() {
         <p className="eyebrow">PWA Preview</p>
         <h1>Publicera en färdig PWA på några sekunder.</h1>
         <p>Logga in för att skapa, uppdatera och hantera dina publicerade prototyper.</p>
-        <a className="button primary wide" href="/auth/login/github">Fortsätt med GitHub</a>
-        {googleEnabled && <a className="button primary wide" href="/auth/login/google">Fortsätt med Google</a>}
+        <div className="login-actions">
+          <a className="button primary wide" href="/auth/login/github">Fortsätt med GitHub</a>
+          {googleEnabled && <a className="button primary wide" href="/auth/login/google">Fortsätt med Google</a>}
+        </div>
       </section>
     </main>
   );
@@ -217,7 +219,17 @@ function App() {
 
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
-      {googleEnabled && <section className="access-card"><div className="section-heading"><div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div><a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a></div><p className="access-help">Koppla Google till detta konto för att nå samma prototyper med båda inloggningssätten.</p></section>}
+      {googleEnabled && <section className="access-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div>
+          {!me.identities.some(identity => identity.provider === 'google') && <a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a>}
+        </div>
+        {me.identities.some(identity => identity.provider === 'google') ? (
+          <p className="access-help">✓ Google-konto kopplat{me.identities.find(identity => identity.provider === 'google')?.email ? ': ' + me.identities.find(identity => identity.provider === 'google')?.email : ''}. Du kan logga in med Google och komma åt samma prototyper.</p>
+        ) : (
+          <p className="access-help">Google är inte kopplat till detta konto. Koppla det om du vill kunna logga in med båda metoderna och komma åt samma prototyper.</p>
+        )}
+      </section>}
       <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Integration</p><h2>MCP access</h2></div>
