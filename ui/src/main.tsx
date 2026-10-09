@@ -53,6 +53,7 @@ function formatBytes(value: number | null) {
 
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +79,10 @@ function App() {
 
   useEffect(() => {
     Promise.all([
+      api<{ google: boolean }>('/api/auth/providers').then(p => setGoogleEnabled(p.google)),
       api<RuntimeCapabilities>('/api/capabilities'),
       api<Me>('/api/me').then((value) => ({ authenticated: true as const, value })).catch(() => ({ authenticated: false as const })),
-    ]).then(([runtime, identity]) => {
+    ]).then(([, runtime, identity]) => {
       setCapabilities(runtime);
       setTtl(String(runtime.preview.ttlMinutes.default));
       if (!identity.authenticated) {
@@ -199,8 +201,9 @@ function App() {
         <div className="brand-mark">P</div>
         <p className="eyebrow">PWA Preview</p>
         <h1>Publicera en färdig PWA på några sekunder.</h1>
-        <p>Logga in med GitHub för att skapa, uppdatera och hantera tillfälliga previews.</p>
+        <p>Logga in för att skapa, uppdatera och hantera dina publicerade prototyper.</p>
         <a className="button primary wide" href="/auth/login/github">Fortsätt med GitHub</a>
+        {googleEnabled && <a className="button primary wide" href="/auth/login/google">Fortsätt med Google</a>}
       </section>
     </main>
   );
@@ -214,6 +217,7 @@ function App() {
 
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
+      {googleEnabled && <section className="access-card"><div className="section-heading"><div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div><a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a></div><p className="access-help">Koppla Google till detta konto för att nå samma prototyper med båda inloggningssätten.</p></section>}
       <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Integration</p><h2>MCP access</h2></div>

@@ -21,6 +21,11 @@ try {
 const pool = createDatabasePool(config.databaseUrl);
 if (config.migrateOnStart) await runMigrations(pool);
 
+if (config.googleAllowlistEmails) {
+  const allowlistRepository = new AllowlistRepository(pool);
+  await allowlistRepository.syncProvider('google', config.googleAllowlistEmails);
+}
+
 if (config.githubAllowlistEmails) {
   const allowlistRepository = new AllowlistRepository(pool);
   await allowlistRepository.syncGitHub(config.githubAllowlistEmails);

@@ -31,6 +31,31 @@ describe('auth routes', () => {
     await app.close();
   });
 
+  it('exposes enabled providers and disables Google when unconfigured', async () => {
+    const app = buildApp({ config, pool: unusedPool });
+    const providers = await app.inject({ method: 'GET', url: '/api/auth/providers', headers: { host: config.controlPlaneHost } });
+    expect(providers.json()).toEqual({ github: true, google: false });
+    const google = await app.inject({ method: 'GET', url: '/auth/login/google', headers: { host: config.controlPlaneHost } });
+    expect(google.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('starts Google OAuth with PKCE, scoped identity and dedicated callback when configured', async () => {
+    const enabled = { ...config, googleClientId: 'google-client', googleClientSecret: 'google-secret' };
+    const app = buildApp({ config: enabled, pool: unusedPool });
+    const response = await app.inject({ method: 'GET', url: '/auth/login/google', headers: { host: config.controlPlaneHost } });
+    expect(response.statusCode).toBe(302);
+    const url = new URL(response.headers.location!);
+    expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(url.searchParams.get('redirect_uri')).toBe('https://pwa-preview.example.com/auth/callback/google');
+    expect(url.searchParams.get('scope')).toBe('openid email profile');
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.get('code_challenge')).toBeTruthy();
+    const link = await app.inject({ method: 'GET', url: '/auth/login/google?link=true', headers: { host: config.controlPlaneHost } });
+    expect(link.statusCode).toBe(401);
+    await app.close();
+  });
+
   it('requires authentication for /api/me', async () => {
     const app = buildApp({ config, pool: unusedPool });
     const response = await app.inject({ method: 'GET', url: '/api/me', headers: { host: config.controlPlaneHost } });
