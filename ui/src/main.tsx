@@ -98,6 +98,22 @@ function App() {
     });
   }, []);
 
+  async function unlinkIdentity(provider: 'github' | 'google') {
+    if (!me || me.identities.length <= 1) return;
+    const label = provider === 'github' ? 'GitHub' : 'Google';
+    if (!window.confirm('Vill du ta bort kopplingen till ' + label + '? Du kommer inte längre att kunna logga in med det kontot. Dina prototyper finns kvar.')) return;
+    setBusy('unlink-' + provider);
+    setError(null);
+    try {
+      await api('/api/me/identities/' + provider, { method: 'DELETE' });
+      setMe(await api<Me>('/api/me'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunde inte ta bort kontokopplingen');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function createMcpToken() {
     setBusy('mcp-token'); setError(null);
     try {
@@ -219,17 +235,25 @@ function App() {
 
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
-      {googleEnabled && <section className="access-card">
+      <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div>
-          {!me.identities.some(identity => identity.provider === 'google') && <a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a>}
         </div>
-        {me.identities.some(identity => identity.provider === 'google') ? (
-          <p className="access-help">✓ Google-konto kopplat{me.identities.find(identity => identity.provider === 'google')?.email ? ': ' + me.identities.find(identity => identity.provider === 'google')?.email : ''}. Du kan logga in med Google och komma åt samma prototyper.</p>
-        ) : (
-          <p className="access-help">Google är inte kopplat till detta konto. Koppla det om du vill kunna logga in med båda metoderna och komma åt samma prototyper.</p>
-        )}
-      </section>}
+        <div className="identity-list">
+          {me.identities.filter(identity => identity.provider === 'github' || identity.provider === 'google').map(identity => (
+            <div className="identity-item" key={identity.provider}>
+              <div><strong>{identity.provider === 'github' ? 'GitHub' : 'Google'} – kopplat</strong><p>{identity.email ?? 'Verifierat konto'}</p></div>
+              <button className="button ghost" type="button"
+                disabled={me.identities.length <= 1 || busy !== null}
+                title={me.identities.length <= 1 ? 'Den sista inloggningsmetoden kan inte tas bort' : 'Ta bort kontokopplingen'}
+                onClick={() => void unlinkIdentity(identity.provider as 'github' | 'google')}>Ta bort koppling</button>
+            </div>
+          ))}
+        </div>
+        {googleEnabled && !me.identities.some(identity => identity.provider === 'google') &&
+          <a className="button ghost" href="/auth/login/google?link=true">Koppla Google-konto</a>}
+        {me.identities.length <= 1 && <p className="access-help">Du behöver minst en kopplad inloggningsmetod.</p>}
+      </section>
       <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Integration</p><h2>MCP access</h2></div>
