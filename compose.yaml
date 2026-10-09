@@ -11,6 +11,9 @@ services:
       SESSION_SECRET: local-development-secret-change-me-000000000
       GITHUB_CLIENT_ID: local-placeholder
       GITHUB_CLIENT_SECRET: local-placeholder
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PWA_PREVIEW_GOOGLE_ALLOWLIST_EMAILS: ${PWA_PREVIEW_GOOGLE_ALLOWLIST_EMAILS:-}
     ports:
       - "3000:3000"
     volumes:
