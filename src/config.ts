@@ -7,6 +7,9 @@ export type AppConfig = Readonly<{
   sessionSecret: string;
   githubClientId: string;
   githubClientSecret: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleAllowlistEmails?: readonly string[];
   githubAllowlistEmails?: readonly string[];
   allowSameSitePreviews?: boolean;
   ttlMinMinutes: number;
@@ -124,6 +127,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     throw new Error('Invalid configuration: PREVIEW_DOMAIN_SUFFIX must use a separate registrable domain unless ALLOW_SAME_SITE_PREVIEWS=true');
   }
 
+  if (Boolean(env.GOOGLE_CLIENT_ID?.trim()) !== Boolean(env.GOOGLE_CLIENT_SECRET?.trim())) throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set together');
   return Object.freeze({
     controlPlaneHost,
     controlPlaneRegistrableDomain,
@@ -133,6 +137,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
     sessionSecret,
     githubClientId: required(env, 'GITHUB_CLIENT_ID'),
     githubClientSecret: required(env, 'GITHUB_CLIENT_SECRET'),
+    ...(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim() ? { googleClientId: env.GOOGLE_CLIENT_ID.trim(), googleClientSecret: env.GOOGLE_CLIENT_SECRET.trim() } : {}),
+    ...(optionalEmailList(env, 'PWA_PREVIEW_GOOGLE_ALLOWLIST_EMAILS') ? { googleAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GOOGLE_ALLOWLIST_EMAILS')! } : {}),
     ...(optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS') ? { githubAllowlistEmails: optionalEmailList(env, 'PWA_PREVIEW_GITHUB_ALLOWLIST_EMAILS')! } : {}),
     allowSameSitePreviews,
     ttlMinMinutes,
