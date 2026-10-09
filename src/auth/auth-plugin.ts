@@ -6,6 +6,7 @@ import type { DatabasePool } from '../persistence/db.js';
 import type { AuthContext } from './auth-context.js';
 import { GithubHttpClient, type GithubClient } from './github-client.js';
 import { GoogleOidcClient } from './google-client.js';
+import { IdentityRepository } from '../persistence/repositories/identity-repository.js';
 import { AccessDeniedError, UserService } from '../users/user-service.js';
 
 declare module 'fastify' {
@@ -20,6 +21,11 @@ declare module '@fastify/secure-session' {
     oauthProvider?: string;
     oauthVerifier?: string;
     oauthLinkUserId?: string;
+    mergeDestinationId?: string;
+    mergeSourceId?: string;
+    mergeProvider?: string;
+    mergeSubject?: string;
+    mergeExpiresAt?: number;
   }
 }
 
@@ -50,6 +56,31 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
 
   const github = options.githubClient ?? new GithubHttpClient(options.config.githubClientId, options.config.githubClientSecret);
   const users = new UserService(options.pool);
+  const identities = new IdentityRepository(options.pool);
+  const clearMerge = (request: FastifyRequest) => {
+    for (const key of ['mergeDestinationId', 'mergeSourceId', 'mergeProvider', 'mergeSubject', 'mergeExpiresAt'] as const) request.session.set(key, undefined);
+  };
+  const stageMerge = async (request: FastifyRequest, linkUserId: string, provider: 'github' | 'google', subject: string) => {
+    const conflict = await identities.findByProviderSubject(provider, subject);
+    if (!conflict || conflict.userId === linkUserId) return false;
+    clearMerge(request);
+    request.session.set('mergeDestinationId', linkUserId);
+    request.session.set('mergeSourceId', conflict.userId);
+    request.session.set('mergeProvider', provider);
+    request.session.set('mergeSubject', subject);
+    request.session.set('mergeExpiresAt', Date.now() + 5 * 60_000);
+    return true;
+  };
+  const pendingMerge = (request: FastifyRequest) => {
+    const destinationId = request.session.get('mergeDestinationId');
+    const sourceId = request.session.get('mergeSourceId');
+    const provider = request.session.get('mergeProvider');
+    const subject = request.session.get('mergeSubject');
+    const expiry = request.session.get('mergeExpiresAt');
+    if (typeof destinationId !== 'string' || destinationId !== request.authContext?.userId || typeof sourceId !== 'string' || (provider !== 'github' && provider !== 'google') || typeof subject !== 'string' || typeof expiry !== 'number' || Date.now() >= expiry) return null;
+    return { destinationId, sourceId, provider, subject };
+  };
+
   const google = options.config.googleClientId && options.config.googleClientSecret ? new GoogleOidcClient(options.config.googleClientId, options.config.googleClientSecret) : null;
 
   app.decorateRequest('authContext', null);
@@ -73,6 +104,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     const query = request.query as { returnTo?: string; link?: string };
     request.session.set('oauthReturnTo', query.returnTo?.startsWith('/authorize?') ? query.returnTo : '');
     const state = randomBytes(24).toString('base64url');
+    clearMerge(request);
     request.session.set('oauthStateHash', stateHash(state));
     request.session.set('oauthProvider', 'github');
     const linkUserId = query.link === 'true' ? request.authContext?.userId : undefined;
@@ -103,6 +135,11 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     try {
       const token = await github.exchangeCode(query.code);
       const identity = await github.fetchIdentity(token);
+      const linked = linkUserId ? await identities.findByProviderSubject('github', identity.subject) : null;
+      if (linkUserId && linked && linked.userId !== linkUserId) {
+        await stageMerge(request, linkUserId, 'github', identity.subject);
+        return reply.redirect('/?merge=review');
+      }
       const { userId } = await users.loginWithProvider('github', identity, linkUserId || undefined);
       request.session.set('userId', userId);
       const returnTo = request.session.get('oauthReturnTo');
@@ -126,6 +163,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     const state = randomBytes(24).toString('base64url');
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
+    clearMerge(request);
     request.session.set('oauthStateHash', stateHash(state));
     request.session.set('oauthProvider', 'google');
     request.session.set('oauthVerifier', verifier);
@@ -157,6 +195,11 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     if (linkUserId && request.authContext?.userId !== linkUserId) return reply.code(401).send({ error: 'LINK_SESSION_EXPIRED' });
     try {
       const identity = await google.exchangeCode(query.code, 'https://' + options.config.controlPlaneHost + '/auth/callback/google', verifier);
+      const linked = linkUserId ? await identities.findByProviderSubject('google', identity.subject) : null;
+      if (linkUserId && linked && linked.userId !== linkUserId) {
+        await stageMerge(request, linkUserId, 'google', identity.subject);
+        return reply.redirect('/?merge=review');
+      }
       const { userId } = await users.loginWithProvider('google', identity, linkUserId || undefined);
       request.session.set('userId', userId);
       const returnTo = request.session.get('oauthReturnTo');
@@ -167,6 +210,37 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
       if (error instanceof Error && error.message === 'IDENTITY_ALREADY_LINKED') return reply.code(409).send({ error: error.message });
       request.log.warn({ err: error }, 'google oauth callback failed');
       return reply.code(401).send({ error: 'AUTHENTICATION_FAILED' });
+    }
+  });
+
+  app.get('/api/account-merge', { preHandler: requireAuth }, async (request, reply) => {
+    const pending = pendingMerge(request);
+    if (!pending) return reply.code(404).send({ error: 'NO_PENDING_MERGE' });
+    const summary = await users.getMergePreview(pending.destinationId, pending.sourceId);
+    if (!summary) return reply.code(409).send({ error: 'INVALID_MERGE' });
+    return { provider: pending.provider, ...summary };
+  });
+
+  app.post('/api/account-merge/cancel', { preHandler: requireAuth }, async (request, reply) => {
+    if (request.headers.origin !== 'https://' + options.config.controlPlaneHost) return reply.code(403).send({ error: 'INVALID_REQUEST_ORIGIN' });
+    clearMerge(request);
+    return reply.code(204).send();
+  });
+
+  app.post('/api/account-merge/confirm', { preHandler: requireAuth }, async (request, reply) => {
+    if (request.headers.origin !== 'https://' + options.config.controlPlaneHost) return reply.code(403).send({ error: 'INVALID_REQUEST_ORIGIN' });
+    const pending = pendingMerge(request);
+    if (!pending) return reply.code(409).send({ error: 'MERGE_EXPIRED' });
+    try {
+      await users.mergeAccounts(pending.destinationId, pending.sourceId, pending.provider, pending.subject,
+        { active: options.config.maxActivePreviewsPerUser, permanent: 10, storage: options.config.maxStorageBytesPerUser });
+      clearMerge(request);
+      return reply.code(204).send();
+    } catch (error) {
+      if (error instanceof Error && ['MERGE_LIMIT_EXCEEDED', 'MERGE_ACCOUNT_CHANGED'].includes(error.message)) {
+        return reply.code(409).send({ error: error.message });
+      }
+      throw error;
     }
   });
 
