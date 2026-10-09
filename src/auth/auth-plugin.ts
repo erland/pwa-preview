@@ -168,6 +168,21 @@ export async function registerAuth(app: FastifyInstance, options: AuthPluginOpti
     return reply.code(204).send();
   });
 
+  app.delete('/api/me/identities/:provider', { preHandler: requireAuth }, async (request, reply) => {
+    const { provider } = request.params as { provider: string };
+    if (provider !== 'github' && provider !== 'google') return reply.code(400).send({ error: 'UNSUPPORTED_IDENTITY_PROVIDER' });
+
+    // A state-changing, cookie-authenticated request must originate from the control plane.
+    const origin = request.headers.origin;
+    if (origin !== 'https://' + options.config.controlPlaneHost) {
+      return reply.code(403).send({ error: 'INVALID_REQUEST_ORIGIN' });
+    }
+    const result = await users.unlinkProvider(request.authContext!.userId, provider);
+    if (result === 'not_found') return reply.code(404).send({ error: 'IDENTITY_NOT_LINKED' });
+    if (result === 'last_identity') return reply.code(409).send({ error: 'LAST_LOGIN_METHOD' });
+    return reply.code(204).send();
+  });
+
   app.get('/api/me', { preHandler: requireAuth }, async (request) => {
     const userId = request.authContext!.userId;
     const result = await options.pool.query<{ provider: string; email: string | null }>(
