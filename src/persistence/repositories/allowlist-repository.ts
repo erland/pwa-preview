@@ -13,6 +13,10 @@ export class AllowlistRepository {
   }
 
   async syncGitHub(emails: readonly string[]): Promise<void> {
+    return this.syncProvider('github', emails);
+  }
+
+  async syncProvider(provider: 'github' | 'google', emails: readonly string[]): Promise<void> {
     if (emails.length === 0) return;
     await this.pool.query(
       `WITH desired(email) AS (
@@ -21,7 +25,7 @@ export class AllowlistRepository {
        ),
        upserted AS (
          INSERT INTO allowlist_entries(provider, email, enabled)
-         SELECT 'github', email, true
+         SELECT $2, email, true
          FROM desired
          ON CONFLICT ((coalesce(provider, '')), lower(email))
          DO UPDATE SET email = EXCLUDED.email, enabled = true, updated_at = now()
@@ -29,12 +33,12 @@ export class AllowlistRepository {
        )
        UPDATE allowlist_entries AS existing
        SET enabled = false, updated_at = now()
-       WHERE existing.provider = 'github'
+       WHERE existing.provider = $2
          AND existing.enabled = true
          AND NOT EXISTS (
            SELECT 1 FROM desired WHERE desired.email = lower(existing.email)
          )`,
-      [emails],
+      [emails, provider],
     );
   }
 
