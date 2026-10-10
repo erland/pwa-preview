@@ -32,20 +32,7 @@ type RuntimeCapabilities = {
   artifact: { maxCompressedBytes: number };
 };
 
-const visualTest = new URLSearchParams(window.location.search).has('__visual_test');
-const visualMocks: Preview[] = [
-  {previewId:'p-qa-demo-import',name:'Importdeklaration',url:'https://import.preview.example',status:'READY',createdAt:'2026-10-10T03:00:00Z',updatedAt:'2026-10-10T03:00:00Z',expiresAt:null,publicationMode:'PERMANENT',slug:'import',compressedSizeBytes:12000,extractedSizeBytes:56000,fileCount:12,sourceSha256:null,sourceType:'UPLOAD'},
-  {previewId:'p-qa-demo-case',name:'Utredningssystem',url:'https://cases.preview.example',status:'READY',createdAt:'2026-10-09T03:00:00Z',updatedAt:'2026-10-09T03:00:00Z',expiresAt:'2026-10-11T03:00:00Z',publicationMode:'TEMPORARY',slug:null,compressedSizeBytes:7000,extractedSizeBytes:12000,fileCount:8,sourceSha256:null,sourceType:'UPLOAD'},
-  {previewId:'p-qa-demo-report',name:'Statistikdashboard',url:'https://stats.preview.example',status:'READY',createdAt:'2026-10-08T03:00:00Z',updatedAt:'2026-10-08T03:00:00Z',expiresAt:'2026-10-12T03:00:00Z',publicationMode:'TEMPORARY',slug:null,compressedSizeBytes:4000,extractedSizeBytes:8000,fileCount:6,sourceSha256:null,sourceType:'URL'}
-];
 async function api<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  if (visualTest) {
-    if (input === '/api/auth/providers') return {google:true} as T;
-    if (input === '/api/capabilities') return {preview:{ttlMinutes:{min:5,default:60,max:1440},name:{maxLength:200},sourceUrl:{requiresHttps:true}},artifact:{maxCompressedBytes:100000000}} as T;
-    if (input === '/api/me') return {userId:'qa-user',identities:[{provider:'google',email:'demo@example.test'},{provider:'github',email:'demo@example.test'}]} as T;
-    if (input === '/api/previews') return {previews:visualMocks} as T;
-    return undefined as T;
-  }
   const response = await fetch(input, { credentials: 'same-origin', ...init });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -69,8 +56,8 @@ function formatBytes(value: number | null) {
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [merge, setMerge] = useState<MergePreview | null>(null);
-  const [page, setPage] = useState<'previews' | 'settings'>(() => window.location.pathname === '/settings' || new URLSearchParams(window.location.search).get('view')==='settings' ? 'settings' : 'previews');
-  const [showCreate, setShowCreate] = useState(() => new URLSearchParams(window.location.search).has('create'));
+  const [page, setPage] = useState<'previews' | 'settings'>(() => window.location.pathname === '/settings' ? 'settings' : 'previews');
+  const [showCreate, setShowCreate] = useState(false);
   const [filter, setFilter] = useState<'all' | 'temporary' | 'permanent'>('all');
   const [menuId, setMenuId] = useState<string | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
