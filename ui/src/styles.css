@@ -5,3 +5,17 @@
 .identity-list{display:grid;gap:12px;margin:18px 0}.identity-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid #e2e8f0;border-radius:12px}.identity-item p{color:#64748b;font-size:.86rem;margin:6px 0 0;overflow-wrap:anywhere}.identity-item button{flex-shrink:0}@media(max-width:520px){.identity-item{align-items:stretch;flex-direction:column}.identity-item button{align-self:flex-start}}
 
 .merge-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}.merge-stats>div{padding:16px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc}.merge-stats p{margin:8px 0 0;color:#64748b;font-size:.9rem}@media(max-width:600px){.merge-stats{grid-template-columns:1fr}}
+
+/* Preview-focused dashboard */
+.dashboard-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px 24px;border:1px solid #e2e8f0;border-radius:20px;background:#fff}
+.dashboard-hero h2{margin:0 0 8px}.dashboard-hero p:last-child{margin:0;color:#64748b}
+.dashboard-hero .button{white-space:nowrap}
+.dashboard-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 32px}
+.dashboard-stats>div{display:grid;gap:6px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:15px 18px}
+.dashboard-stats strong{font-size:1.6rem}.dashboard-stats span{font-size:.82rem;color:#64748b}
+.dialog-backdrop{position:fixed;inset:0;z-index:20;display:grid;place-items:center;overflow-y:auto;background:rgba(15,23,42,.55);padding:16px}
+.dialog-panel{width:min(100%,650px);max-height:calc(100vh - 32px);overflow-y:auto}
+.dialog-panel .create-card{margin:0}.dialog-panel .segmented{margin:18px 0}
+.secondary-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;border-top:1px solid #eef2f7;padding-top:14px;margin-top:14px}
+.settings-content{max-width:850px;margin:0 auto}
+@media(max-width:720px){.dashboard-hero{align-items:stretch;flex-direction:column;padding:18px}.dashboard-hero .button{width:100%}.dashboard-stats{gap:8px}.dashboard-stats>div{padding:12px}.dashboard-stats strong{font-size:1.35rem}.secondary-actions{justify-content:stretch}.secondary-actions .button{flex:1 1 140px}.list-section>.section-heading{align-items:flex-start;flex-direction:column}.list-section .segmented{max-width:100%;overflow-x:auto}.dialog-panel .create-card{padding:20px}}
