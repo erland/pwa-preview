@@ -21,6 +21,14 @@ export class PreviewRepository {
     return mapPreview(result.rows[0]!);
   }
 
+  async renameOwned(ownerUserId: string, id: string, name: string): Promise<Preview | null> {
+    const result = await this.pool.query(
+      "UPDATE previews SET display_name=$3, updated_at=now() WHERE id=$1 AND owner_user_id=$2 AND status NOT IN ('DELETED','DELETING','EXPIRED') RETURNING *",
+      [id, ownerUserId, name],
+    );
+    return result.rows[0] ? mapPreview(result.rows[0]) : null;
+  }
+
   async findOwnedById(ownerUserId: string, id: string): Promise<Preview | null> {
     const result = await this.pool.query('SELECT * FROM previews WHERE id = $1 AND owner_user_id = $2', [id, ownerUserId]);
     return result.rows[0] ? mapPreview(result.rows[0]) : null;
