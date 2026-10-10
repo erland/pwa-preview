@@ -16,6 +16,7 @@ import { servePreview } from './static-site-handler.js';
 import { isApplicationError } from '../errors/application-error.js';
 import { toPreviewOutput } from './preview-output.js';
 import { exportPreviewZip } from './preview-zip-export.js';
+import { previewDownloadDisposition } from './preview-download-filename.js';
 import { previewStorageKey } from '../storage/storage-key.js';
 import { createUrlInputSchema, extendInputSchema, lifetimeMinutesSchema, previewIdSchema, previewNameSchema, updateUrlInputSchema } from './preview-input.js';
 
@@ -133,7 +134,7 @@ export async function registerPreviewHttp(
       const zip = await exportPreviewZip(store.getPreviewSiteRoot(previewStorageKey(parsedId.data)));
       return reply
         .header('Content-Type', 'application/zip')
-        .header('Content-Disposition', `attachment; filename="${parsedId.data}.zip"`)
+        .header('Content-Disposition', previewDownloadDisposition(preview.displayName, parsedId.data))
         .header('Cache-Control', 'private, no-store')
         .send(zip.outputStream);
     } catch (error) {
