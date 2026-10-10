@@ -6,5 +6,7 @@ export async function registerUi(app: FastifyInstance): Promise<void> {
   const root = path.resolve('dist/ui');
   const assetsRoot = path.join(root, 'assets');
   await app.register(staticPlugin, { root: assetsRoot, prefix: '/assets/' });
-  app.get('/', async (_request, reply) => reply.type('text/html').sendFile('index.html', root));
+  const renderIndex = async (_request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => reply.type('text/html').sendFile('index.html', root);
+  app.get('/', renderIndex);
+  app.get('/settings', renderIndex);
 }
