@@ -56,6 +56,10 @@ function formatBytes(value: number | null) {
 function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [merge, setMerge] = useState<MergePreview | null>(null);
+  const [page, setPage] = useState<'previews' | 'settings'>(() => window.location.pathname === '/settings' ? 'settings' : 'previews');
+  const [showCreate, setShowCreate] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'temporary' | 'permanent'>('all');
+  const [menuId, setMenuId] = useState<string | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
   const [previews, setPreviews] = useState<Preview[]>([]);
@@ -68,7 +72,11 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [mcpToken, setMcpToken] = useState<{ token: string; expiresAt: string } | null>(null);
 
-  const sorted = useMemo(() => [...previews].sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [previews]);
+  const sorted = useMemo(() => [...previews].filter(p => filter === 'all' || p.publicationMode === (filter === 'temporary' ? 'TEMPORARY' : 'PERMANENT')).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [previews, filter]);
+  const activeCount = previews.filter(p => !['DELETED','EXPIRED'].includes(p.status)).length;
+  const permanentCount = previews.filter(p => p.publicationMode === 'PERMANENT').length;
+  function navigate(next: 'previews' | 'settings') { setPage(next); window.history.pushState({}, '', next === 'settings' ? '/settings' : '/'); setMenuId(null); }
+  useEffect(() => { const onPop = () => setPage(window.location.pathname === '/settings' ? 'settings' : 'previews'); window.addEventListener('popstate', onPop); return () => window.removeEventListener('popstate', onPop); }, []);
 
   async function refresh() {
     try {
@@ -182,7 +190,7 @@ function App() {
           body: JSON.stringify({ sourceUrl: sourceUrl.trim(), lifetimeMinutes: Number(ttl), name: name.trim() || undefined }),
         });
       }
-      setName(''); setSourceUrl(''); setFile(null);
+      setName(''); setSourceUrl(''); setFile(null); setShowCreate(false);
       await refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte skapa preview'); }
     finally { setBusy(null); }
@@ -250,10 +258,12 @@ function App() {
   return (
     <main className="page-shell">
       <header className="topbar">
-        <div><p className="eyebrow">PWA Preview</p><h1>Mina previews</h1></div>
-        <div className="header-actions"><button className="button ghost" onClick={refresh}>Uppdatera</button><form method="post" action="/auth/logout"><button className="button ghost">Logga ut</button></form></div>
+        <div><p className="eyebrow">PWA Preview</p><h1>{page === 'settings' ? 'Inställningar' : 'Mina previews'}</h1></div>
+        <nav className="header-actions" aria-label="Huvudnavigation">
+          {page === 'settings' ? <button className="button ghost" onClick={() => navigate('previews')}>← Mina previews</button> : <button className="button ghost" onClick={() => navigate('settings')}>Inställningar</button>}
+          <form method="post" action="/auth/logout"><button className="button ghost">Logga ut</button></form>
+        </nav>
       </header>
-
       {merge && <section className="access-card" role="dialog" aria-modal="true" aria-labelledby="merge-heading">
         <div className="section-heading"><div><p className="eyebrow">Kontokoppling</p><h2 id="merge-heading">Vill du slå samman dina konton?</h2></div></div>
         <p className="access-help">Ditt {merge.provider === 'github' ? 'GitHub' : 'Google'}-konto är redan kopplat till ett annat PWA Preview-konto. Du har nu autentiserat båda kontona.</p>
@@ -269,6 +279,7 @@ function App() {
       </section>}
       {error && <div className="alert" role="alert">{error}<button onClick={() => setError(null)}>×</button></div>}
 
+      {page === 'settings' && <div className="settings-content">
       <section className="access-card">
         <div className="section-heading">
           <div><p className="eyebrow">Konto</p><h2>Inloggningsmetoder</h2></div>
@@ -305,8 +316,15 @@ function App() {
         </div>}
       </section>
 
-      <section className="create-card">
-        <div className="section-heading"><div><p className="eyebrow">Ny preview</p><h2>Publicera statiskt innehåll</h2></div><div className="segmented"><button className={mode==='upload'?'active':''} onClick={() => setMode('upload')}>Fil</button><button className={mode==='url'?'active':''} onClick={() => setMode('url')}>URL</button></div></div>
+      </div>}
+      {page === 'previews' && <>
+        <section className="dashboard-hero">
+          <div><p className="eyebrow">Översikt</p><h2>Dina publicerade prototyper</h2><p>Öppna och hantera dina previews eller publicera en ny.</p></div>
+          <button className="button primary" onClick={() => setShowCreate(true)}>+ Ny preview</button>
+        </section>
+        <div className="dashboard-stats"><div><strong>{activeCount}</strong><span>Aktiva</span></div><div><strong>{previews.length - permanentCount}</strong><span>Tillfälliga</span></div><div><strong>{permanentCount}</strong><span>Permanenta</span></div></div>
+        {showCreate && <div className="dialog-backdrop" onClick={() => setShowCreate(false)}><div className="dialog-panel" onClick={e => e.stopPropagation()}>      <section className="create-card" role="dialog" aria-modal="true" aria-label="Ny preview">
+        <div className="section-heading"><div><p className="eyebrow">Ny preview</p><h2>Publicera statiskt innehåll</h2></div><button className="button ghost" onClick={() => setShowCreate(false)} aria-label="Stäng">✕</button></div><div className="segmented"><button className={mode==='upload'?'active':''} onClick={() => setMode('upload')}>Fil</button><button className={mode==='url'?'active':''} onClick={() => setMode('url')}>URL</button></div></div>
         <form className="create-grid" onSubmit={createPreview}>
           <label>Namn<span>Valfritt</span><input value={name} maxLength={capabilities.preview.name.maxLength} onChange={e=>setName(e.target.value)} placeholder="Min prototyp" /></label>
           <label>Livslängd<span>{capabilities.preview.ttlMinutes.min}–{capabilities.preview.ttlMinutes.max} minuter</span><input type="number" min={capabilities.preview.ttlMinutes.min} max={capabilities.preview.ttlMinutes.max} value={ttl} onChange={e=>setTtl(e.target.value)} /></label>
@@ -315,16 +333,28 @@ function App() {
         </form>
       </section>
 
+</div></div>}
       <section className="list-section">
-        <div className="section-heading"><div><p className="eyebrow">Aktiva</p><h2>{sorted.length} preview{sorted.length === 1 ? '' : 's'}</h2></div></div>
-        {sorted.length === 0 ? <div className="empty"><strong>Inga previews ännu</strong><p>Skapa din första preview ovan.</p></div> : <div className="cards">{sorted.map(preview => (
+        <div className="section-heading"><div><p className="eyebrow">Publiceringar</p><h2>Previews</h2></div><div className="segmented" aria-label="Filtrera previews"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>Alla</button><button className={filter==='temporary'?'active':''} onClick={()=>setFilter('temporary')}>Tillfälliga</button><button className={filter==='permanent'?'active':''} onClick={()=>setFilter('permanent')}>Permanenta</button></div></div>
+        {sorted.length === 0 ? <div className="empty"><strong>Inga previews ännu</strong><p>Välj Ny preview för att publicera din första prototyp.</p></div> : <div className="cards">{sorted.map(preview => (
           <article className="preview-card" key={preview.previewId}>
             <div className="preview-main"><div className="preview-title"><span className={`status ${preview.status.toLowerCase()}`}>{preview.status}</span><h3>{preview.name || 'Namnlös preview'}</h3><code>{preview.previewId}</code></div><a className="open-link" href={preview.url} target="_blank" rel="noreferrer">Öppna ↗</a></div>
             <div className="meta-grid"><div><span>Utgår</span><strong>{preview.expiresAt ? formatDate(preview.expiresAt) : 'Permanent'}</strong></div><div><span>Källa</span><strong>{preview.sourceType}</strong></div><div><span>Storlek</span><strong>{formatBytes(preview.extractedSizeBytes)}</strong></div><div><span>Filer</span><strong>{preview.fileCount ?? '–'}</strong></div></div>
-            <div className="card-actions"><a className="button ghost" href={`/api/previews/${preview.previewId}/download`} aria-disabled={preview.status !== 'READY'} onClick={e=>{if(preview.status!=='READY')e.preventDefault();}}>Ladda ned ZIP</a><label className="button ghost upload-button">Uppdatera<input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>{void update(preview,e.target.files?.[0] ?? null); e.currentTarget.value='';}} disabled={busy===preview.previewId} /></label>{preview.publicationMode === "TEMPORARY" && <><button className="button ghost" onClick={()=>promote(preview)} disabled={busy===preview.previewId || preview.status !== "READY"}>Behåll permanent</button><button className="button ghost" onClick={()=>extend(preview)} disabled={busy===preview.previewId}>Förläng</button></>}<button className="button danger" onClick={()=>remove(preview)} disabled={busy===preview.previewId}>Radera</button></div>
+            <div className="card-actions">
+              <a className="button primary" href={preview.url} target="_blank" rel="noreferrer">Öppna ↗</a>
+              <button className="button ghost" onClick={() => setMenuId(menuId === preview.previewId ? null : preview.previewId)} aria-expanded={menuId===preview.previewId} aria-label="Fler åtgärder">Fler åtgärder ⋯</button>
+            </div>
+            {menuId === preview.previewId && <div className="secondary-actions">
+              <a className="button ghost" href={`/api/previews/${preview.previewId}/download`} aria-disabled={preview.status !== 'READY'} onClick={e=>{if(preview.status!=='READY')e.preventDefault();}}>Ladda ned ZIP</a>
+              <label className="button ghost upload-button">Uppdatera<input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>{void update(preview,e.target.files?.[0] ?? null);e.currentTarget.value='';}} disabled={busy===preview.previewId} /></label>
+              {preview.publicationMode === 'TEMPORARY' && <><button className="button ghost" onClick={()=>promote(preview)} disabled={busy===preview.previewId || preview.status!=='READY'}>Behåll permanent</button><button className="button ghost" onClick={()=>extend(preview)} disabled={busy===preview.previewId}>Förläng</button></>}
+              <button className="button danger" onClick={()=>remove(preview)} disabled={busy===preview.previewId}>Radera</button>
+            </div>}
           </article>
         ))}</div>}
       </section>
+
+      </>}
     </main>
   );
 }
