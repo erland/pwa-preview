@@ -100,6 +100,17 @@ export async function registerPreviewHttp(
     return { previews: previews.map(toPreviewOutput) };
   });
 
+  app.patch('/api/previews/:id/name', { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!previewIdSchema.safeParse(id).success) return reply.code(400).send({ error: 'INVALID_PREVIEW_ID' });
+    if (request.headers.origin !== 'https://' + config.controlPlaneHost) return reply.code(403).send({ error: 'INVALID_REQUEST_ORIGIN' });
+    const parsed = previewNameSchema.safeParse((request.body as { name?: unknown } | undefined)?.name);
+    if (!parsed.success) return reply.code(400).send({ error: validationError(parsed) });
+    const preview = await repository.renameOwned(request.authContext!.userId, id, parsed.data);
+    if (!preview) return reply.code(404).send({ error: 'PREVIEW_NOT_FOUND' });
+    return toPreviewOutput(preview);
+  });
+
   app.get('/api/previews/:id', { preHandler: requireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const parsedId = previewIdSchema.safeParse(id);
