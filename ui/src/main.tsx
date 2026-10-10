@@ -59,6 +59,7 @@ function App() {
   const [page, setPage] = useState<'previews' | 'settings'>(() => window.location.pathname === '/settings' ? 'settings' : 'previews');
   const [showCreate, setShowCreate] = useState(false);
   const [filter, setFilter] = useState<'all' | 'temporary' | 'permanent'>('all');
+  const [search, setSearch] = useState('');
   const [menuId, setMenuId] = useState<string | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [capabilities, setCapabilities] = useState<RuntimeCapabilities | null | undefined>(undefined);
@@ -72,9 +73,7 @@ function App() {
   const [file, setFile] = useState<File | null>(null);
   const [mcpToken, setMcpToken] = useState<{ token: string; expiresAt: string } | null>(null);
 
-  const sorted = useMemo(() => [...previews].filter(p => filter === 'all' || p.publicationMode === (filter === 'temporary' ? 'TEMPORARY' : 'PERMANENT')).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [previews, filter]);
-  const activeCount = previews.filter(p => !['DELETED','EXPIRED'].includes(p.status)).length;
-  const permanentCount = previews.filter(p => p.publicationMode === 'PERMANENT').length;
+  const sorted = useMemo(() => [...previews].filter(p => (filter === 'all' || p.publicationMode === (filter === 'temporary' ? 'TEMPORARY' : 'PERMANENT')) && (p.name || p.previewId).toLocaleLowerCase('sv-SE').includes(search.trim().toLocaleLowerCase('sv-SE'))).sort((a,b) => b.createdAt.localeCompare(a.createdAt)), [previews, filter, search]);
   function navigate(next: 'previews' | 'settings') { setPage(next); window.history.pushState({}, '', next === 'settings' ? '/settings' : '/'); setMenuId(null); }
   useEffect(() => { const onPop = () => setPage(window.location.pathname === '/settings' ? 'settings' : 'previews'); window.addEventListener('popstate', onPop); return () => window.removeEventListener('popstate', onPop); }, []);
 
@@ -193,6 +192,25 @@ function App() {
       setName(''); setSourceUrl(''); setFile(null); setShowCreate(false);
       await refresh();
     } catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte skapa preview'); }
+    finally { setBusy(null); }
+  }
+
+  async function rename(preview: Preview) {
+    const next = window.prompt('Nytt namn på prototypen:', preview.name || '');
+    if (next === null) return;
+    const value = next.trim();
+    if (!value || value.length > (capabilities?.preview.name.maxLength ?? 200)) {
+      setError('Ange ett namn på 1–200 tecken.');
+      return;
+    }
+    setBusy(preview.previewId); setError(null);
+    try {
+      await api(`/api/previews/${preview.previewId}/name`, {
+        method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: value }),
+      });
+      await refresh();
+      setMenuId(null);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Kunde inte ändra namn'); }
     finally { setBusy(null); }
   }
 
@@ -322,7 +340,6 @@ function App() {
           <div><p className="eyebrow">Översikt</p><h2>Dina publicerade prototyper</h2><p>Öppna och hantera dina previews eller publicera en ny.</p></div>
           <button className="button primary" onClick={() => setShowCreate(true)}>+ Ny preview</button>
         </section>
-        <div className="dashboard-stats"><div><strong>{activeCount}</strong><span>Aktiva</span></div><div><strong>{previews.length - permanentCount}</strong><span>Tillfälliga</span></div><div><strong>{permanentCount}</strong><span>Permanenta</span></div></div>
         {showCreate && <div className="dialog-backdrop" onClick={() => setShowCreate(false)}><div className="dialog-panel" onClick={e => e.stopPropagation()}>      <section className="create-card" role="dialog" aria-modal="true" aria-label="Ny preview">
         <div className="section-heading"><div><p className="eyebrow">Ny preview</p><h2>Publicera statiskt innehåll</h2></div><button className="button ghost" onClick={() => setShowCreate(false)} aria-label="Stäng">✕</button></div><div className="segmented"><button className={mode==='upload'?'active':''} onClick={() => setMode('upload')}>Fil</button><button className={mode==='url'?'active':''} onClick={() => setMode('url')}>URL</button></div>
         <form className="create-grid" onSubmit={createPreview}>
@@ -335,8 +352,9 @@ function App() {
 
 </div></div>}
       <section className="list-section">
+        <div className="preview-toolbar"><label className="preview-search"><span className="sr-only">Sök previews</span><input type="search" placeholder="Sök prototyp…" value={search} onChange={e => setSearch(e.target.value)} /></label></div>
         <div className="section-heading"><div><p className="eyebrow">Publiceringar</p><h2>Previews</h2></div><div className="segmented" aria-label="Filtrera previews"><button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>Alla</button><button className={filter==='temporary'?'active':''} onClick={()=>setFilter('temporary')}>Tillfälliga</button><button className={filter==='permanent'?'active':''} onClick={()=>setFilter('permanent')}>Permanenta</button></div></div>
-        {sorted.length === 0 ? <div className="empty"><strong>Inga previews ännu</strong><p>Välj Ny preview för att publicera din första prototyp.</p></div> : <div className="cards">{sorted.map(preview => (
+        {sorted.length === 0 ? <div className="empty"><strong>{search || filter !== "all" ? "Inga matchande previews" : "Inga previews ännu"}</strong><p>{search || filter !== "all" ? "Prova en annan sökning eller filtrering." : "Välj Ny preview för att publicera din första prototyp."}</p></div> : <div className="cards">{sorted.map(preview => (
           <article className="preview-card" key={preview.previewId}>
             <div className="preview-main"><div className="preview-title"><span className={`status ${preview.status.toLowerCase()}`}>{preview.status}</span><h3>{preview.name || 'Namnlös preview'}</h3><code>{preview.previewId}</code></div></div>
             <div className="meta-grid"><div><span>Utgår</span><strong>{preview.expiresAt ? formatDate(preview.expiresAt) : 'Permanent'}</strong></div><div><span>Källa</span><strong>{preview.sourceType}</strong></div><div><span>Storlek</span><strong>{formatBytes(preview.extractedSizeBytes)}</strong></div><div><span>Filer</span><strong>{preview.fileCount ?? '–'}</strong></div></div>
@@ -345,6 +363,7 @@ function App() {
               <button className="button ghost" onClick={() => setMenuId(menuId === preview.previewId ? null : preview.previewId)} aria-expanded={menuId===preview.previewId} aria-label="Fler åtgärder">Fler åtgärder ⋯</button>
             </div>
             {menuId === preview.previewId && <div className="secondary-actions">
+              <button className="button ghost" onClick={() => void rename(preview)} disabled={busy===preview.previewId}>Byt namn</button>
               <a className="button ghost" href={`/api/previews/${preview.previewId}/download`} aria-disabled={preview.status !== 'READY'} onClick={e=>{if(preview.status!=='READY')e.preventDefault();}}>Ladda ned ZIP</a>
               <label className="button ghost upload-button">Uppdatera<input type="file" accept=".zip,.gz,.tgz,application/zip,application/gzip" onChange={e=>{void update(preview,e.target.files?.[0] ?? null);e.currentTarget.value='';}} disabled={busy===preview.previewId} /></label>
               {preview.publicationMode === 'TEMPORARY' && <><button className="button ghost" onClick={()=>promote(preview)} disabled={busy===preview.previewId || preview.status!=='READY'}>Behåll permanent</button><button className="button ghost" onClick={()=>extend(preview)} disabled={busy===preview.previewId}>Förläng</button></>}
