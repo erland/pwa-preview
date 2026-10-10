@@ -142,6 +142,21 @@ function App() {
     }
   }
 
+  async function logout() {
+    setBusy('logout'); setError(null);
+    try {
+      await api<void>('/auth/logout', { method: 'POST' });
+      window.history.replaceState({}, '', '/');
+      setMe(null);
+      setPreviews([]);
+      setMcpToken(null);
+      setMerge(null);
+      setPage('previews');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunde inte logga ut');
+    } finally { setBusy(null); }
+  }
+
   async function createMcpToken() {
     setBusy('mcp-token'); setError(null);
     try {
@@ -279,7 +294,7 @@ function App() {
         <div><p className="eyebrow">PWA Preview</p><h1>{page === 'settings' ? 'Inställningar' : 'Mina previews'}</h1></div>
         <nav className="header-actions" aria-label="Huvudnavigation">
           {page === 'settings' ? <button className="button ghost" onClick={() => navigate('previews')}>← Mina previews</button> : <button className="button ghost" onClick={() => navigate('settings')}>Inställningar</button>}
-          <form method="post" action="/auth/logout"><button className="button ghost">Logga ut</button></form>
+          <button type="button" className="button ghost" disabled={busy === 'logout'} onClick={() => void logout()}>{busy === 'logout' ? 'Loggar ut…' : 'Logga ut'}</button>
         </nav>
       </header>
       {merge && <section className="access-card" role="dialog" aria-modal="true" aria-labelledby="merge-heading">
